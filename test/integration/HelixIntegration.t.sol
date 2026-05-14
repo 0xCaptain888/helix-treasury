@@ -53,15 +53,11 @@ contract HelixIntegrationTest is Test {
         );
 
         // 3. ProposalRegistry
-        address[] memory agents = new address[](1);
-        agents[0] = agent;
         proposalRegistry = new ProposalRegistry(
             mockPolicyEngine,
             address(policyRegistry),
-            address(0),  // vault wired after deployment
             safe,
-            1 hours,
-            agents
+            guardian
         );
 
         // 4. TreasuryVault
@@ -74,9 +70,15 @@ contract HelixIntegrationTest is Test {
         );
 
         // 5. TaxEngine
-        taxEngine = new TaxEngine(address(vault), safe, 0 /* US_FIFO */);
+        taxEngine = new TaxEngine(safe, address(vault), bytes8(0) /* US jurisdiction */, 0 /* FIFO */);
 
-        // 6. Register USDC as asset
+        // 6. Wire vault and agent into ProposalRegistry
+        vm.startPrank(safe);
+        proposalRegistry.setVault(address(vault));
+        proposalRegistry.setAuthorizedAgent(agent, true);
+        vm.stopPrank();
+
+        // 7. Register USDC as asset
         vm.prank(safe);
         vault.registerAsset(ITreasuryVault.AssetEntry({
             token: mockUsdc,

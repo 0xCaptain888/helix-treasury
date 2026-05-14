@@ -34,9 +34,15 @@ interface IPolicyRegistry {
     ///      at proposal time and again at activation time.
     function proposeUpdate(bytes calldata newBytecode) external returns (bytes32 newHash);
 
+    /// @notice Submit a policy update with explicit hard constraint IDs.
+    function proposeUpdate(bytes calldata newBytecode, bytes32[] calldata newConstraintIds) external returns (bytes32 newHash);
+
     /// @notice Activate a previously proposed update after the timelock has elapsed.
     /// @dev Re-runs the verifier and confirms hardConstraints ⊇ current.
     function activateUpdate(bytes32 newHash) external;
+
+    /// @notice Convenience: activate the current pending proposal.
+    function activatePending() external;
 
     /// @notice Returns the hard constraints attached to a given policy.
     function getHardConstraints(bytes32 policyHash) external view returns (bytes32[] memory);

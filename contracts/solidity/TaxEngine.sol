@@ -2,7 +2,7 @@
 pragma solidity ^0.8.26;
 
 import {ITaxEngine} from "./interfaces/ITaxEngine.sol";
-import {Action, TaxEventKind} from "./HelixTypes.sol";
+import {Action, ActionKind, TaxEventKind} from "./HelixTypes.sol";
 
 /// @title TaxEngine
 /// @notice Records tax events at execution time using configurable lot method (FIFO/LIFO/HIFO).
@@ -43,9 +43,127 @@ contract TaxEngine is ITaxEngine {
     }
 
     function recordExecution(bytes32 proposalId, Action[] calldata actions) external override onlyVault {
-        // TODO(mulerun): iterate over actions, determine kind (acquisition vs disposition),
-        // update lots, compute realized PnL using lotMethod, emit TaxEventRecorded.
-        revert("TaxEngine: not implemented");
+        for (uint256 i = 0; i < actions.length; i++) {
+            Action calldata a = actions[i];
+            ActionKind k = a.kind;
+
+            if (k == ActionKind.SUPPLY || k == ActionKind.BUY_RWA || k == ActionKind.BUY_PT) {
+                // Acquisition: add a new lot
+                _lotsByAsset[a.asset].push(Lot({
+                    amount: a.amount,
+                    costBasisUsd6: a.amount, // 1:1 placeholder; real price comes via params
+                    acquiredAt: uint64(block.timestamp)
+                }));
+
+                bytes32 evId = keccak256(abi.encodePacked(proposalId, a.asset, i));
+                uint256 idx = _events.length;
+                _events.push(TaxEvent({
+                    id: evId,
+                    proposalId: proposalId,
+                    occurredAt: uint64(block.timestamp),
+                    kind: TaxEventKind.REALIZED_GAIN, // acquisition; no PnL
+                    asset: a.asset,
+                    amount: a.amount,
+                    costBasis: a.amount,
+                    jurisdiction: jurisdiction,
+                    metadata: bytes32(0)
+                }));
+                _eventsByProposal[proposalId].push(idx);
+                emit TaxEventRecorded(evId, proposalId, TaxEventKind.REALIZED_GAIN, a.asset, a.amount, 0);
+
+            } else if (
+                k == ActionKind.WITHDRAW || k == ActionKind.SELL_RWA ||
+                k == ActionKind.SELL_PT  || k == ActionKind.SWAP
+            ) {
+                // Disposition: select lot, compute PnL
+                (uint256 costBasis, uint256 consumed) = _consumeLots(a.asset, a.amount);
+                int256 pnl = int256(a.amount) - int256(costBasis);
+                TaxEventKind evKind = pnl >= 0 ? TaxEventKind.REALIZED_GAIN : TaxEventKind.REALIZED_LOSS;
+
+                bytes32 evId = keccak256(abi.encodePacked(proposalId, a.asset, i));
+                uint256 idx = _events.length;
+                _events.push(TaxEvent({
+                    id: evId,
+                    proposalId: proposalId,
+                    occurredAt: uint64(block.timestamp),
+                    kind: evKind,
+                    asset: a.asset,
+                    amount: consumed,
+                    costBasis: costBasis,
+                    jurisdiction: jurisdiction,
+                    metadata: bytes32(0)
+                }));
+                _eventsByProposal[proposalId].push(idx);
+                emit TaxEventRecorded(evId, proposalId, evKind, a.asset, consumed, pnl);
+
+            } else if (k == ActionKind.TRANSFER) {
+                bytes32 evId = keccak256(abi.encodePacked(proposalId, a.asset, i));
+                uint256 idx = _events.length;
+                _events.push(TaxEvent({
+                    id: evId,
+                    proposalId: proposalId,
+                    occurredAt: uint64(block.timestamp),
+                    kind: TaxEventKind.INTERNAL_TRANSFER,
+                    asset: a.asset,
+                    amount: a.amount,
+                    costBasis: 0,
+                    jurisdiction: jurisdiction,
+                    metadata: bytes32(0)
+                }));
+                _eventsByProposal[proposalId].push(idx);
+                emit TaxEventRecorded(evId, proposalId, TaxEventKind.INTERNAL_TRANSFER, a.asset, a.amount, 0);
+            }
+            // NOOP, SET_FLAG, BORROW, REPAY, etc.: skip
+        }
+    }
+
+    /// @dev Consume lots for a disposition using the configured lotMethod. Returns (totalCostBasis, totalConsumed).
+    function _consumeLots(address asset, uint256 amount) internal returns (uint256 totalCost, uint256 totalConsumed) {
+        Lot[] storage lots = _lotsByAsset[asset];
+        uint256 remaining = amount;
+
+        while (remaining > 0 && lots.length > 0) {
+            uint256 idx = _pickLotIndex(lots);
+            Lot storage lot = lots[idx];
+
+            uint256 take = remaining > lot.amount ? lot.amount : remaining;
+            uint256 cost = (lot.costBasisUsd6 * take) / lot.amount;
+
+            totalCost += cost;
+            totalConsumed += take;
+            remaining -= take;
+
+            if (take == lot.amount) {
+                // Remove lot by swapping with last and popping
+                lots[idx] = lots[lots.length - 1];
+                lots.pop();
+            } else {
+                lot.costBasisUsd6 -= cost;
+                lot.amount -= take;
+            }
+        }
+    }
+
+    /// @dev Pick the lot index based on lotMethod (0=FIFO, 1=LIFO, 2=HIFO).
+    function _pickLotIndex(Lot[] storage lots) internal view returns (uint256) {
+        if (lotMethod == 1) {
+            // LIFO: last element
+            return lots.length - 1;
+        } else if (lotMethod == 2) {
+            // HIFO: highest cost-basis-per-unit
+            uint256 best = 0;
+            uint256 bestRatio = 0;
+            for (uint256 j = 0; j < lots.length; j++) {
+                uint256 ratio = (lots[j].costBasisUsd6 * 1e18) / lots[j].amount;
+                if (ratio > bestRatio) {
+                    bestRatio = ratio;
+                    best = j;
+                }
+            }
+            return best;
+        }
+        // FIFO (0): first element
+        return 0;
     }
 
     function recordCorporateAction(address asset, TaxEventKind kind, uint256 amount, bytes32 metadata)
@@ -53,13 +171,41 @@ contract TaxEngine is ITaxEngine {
         override
         onlyVault
     {
-        // TODO(mulerun): handle dividend/split/merger/delisting events
-        revert("TaxEngine: not implemented");
+        bytes32 evId = keccak256(abi.encodePacked(asset, kind, amount, block.timestamp));
+        uint256 idx = _events.length;
+        bytes32 proposalId = bytes32(0);
+        _events.push(TaxEvent({
+            id: evId,
+            proposalId: proposalId,
+            occurredAt: uint64(block.timestamp),
+            kind: kind,
+            asset: asset,
+            amount: amount,
+            costBasis: 0,
+            jurisdiction: jurisdiction,
+            metadata: metadata
+        }));
+        _eventsByProposal[proposalId].push(idx);
+        emit TaxEventRecorded(evId, proposalId, kind, asset, amount, 0);
     }
 
     function exportPeriod(uint64 startTs, uint64 endTs) external view override returns (TaxEvent[] memory) {
-        // TODO(mulerun): filter _events by occurredAt
-        revert("TaxEngine: not implemented");
+        // First pass: count matching events
+        uint256 count = 0;
+        for (uint256 i = 0; i < _events.length; i++) {
+            if (_events[i].occurredAt >= startTs && _events[i].occurredAt <= endTs) {
+                count++;
+            }
+        }
+        // Second pass: collect them
+        TaxEvent[] memory result = new TaxEvent[](count);
+        uint256 j = 0;
+        for (uint256 i = 0; i < _events.length; i++) {
+            if (_events[i].occurredAt >= startTs && _events[i].occurredAt <= endTs) {
+                result[j++] = _events[i];
+            }
+        }
+        return result;
     }
 
     function setJurisdiction(bytes8 code) external override onlySafe {

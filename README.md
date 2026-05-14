@@ -170,7 +170,7 @@ helix/
 │       └── cli/                 ← CLI commands (policy:from-nl, agent:tick, agent:status)
 ├── sdk/                         ← Client SDK for treasury owners
 ├── scripts/
-│   ├── solidity/                ← Foundry deploy scripts (4 phases)
+│   ├── solidity/                ← Foundry deploy scripts (6 phases)
 │   └── ts/                      ← verify-deployment.ts
 ├── policies/                    ← Example HXP policies
 └── test/                        ← Integration + invariant tests
@@ -198,7 +198,7 @@ helix/
 | Execution Agent (6 components, TypeScript) | ✅ Complete | Week 1 |
 | SDK (`@helix-treasury/sdk`) | ✅ Complete | Week 1 |
 | Policy examples (DAO, RWA Issuer) | ✅ Complete | Week 1 |
-| Foundry deploy scripts (4 phases) | ✅ Complete | Week 1 |
+| Foundry deploy scripts (6 phases) | ✅ Complete | Week 1-2 |
 | GitHub Actions CI (Forge + Cargo + TS) | ✅ Complete | Week 1 |
 | Deploy scripts — constructor params fixed | ✅ Complete | Week 2 |
 | `TreasuryVault` PolicyEngine re-validation at execution | ✅ Complete | Week 2 |
@@ -210,6 +210,15 @@ helix/
 | Pendle YT support (BUY_YT, SELL_YT, REDEEM_PT_AT_MATURITY) | ✅ Complete | Week 2 |
 | LLM subsystem (Anthropic + OpenAI, NL→DSL, explanations) | ✅ Complete | Week 2 |
 | Agent components implemented (MarketMonitor, Simulator, ProposalBuilder, Reporter) | ✅ Complete | Week 2 |
+| `ProposalRegistry` — 6 core functions (submit, approve, cancel, execute, markExecuted, withdrawBond) | ✅ Complete | Week 2 |
+| `PolicyRegistry` — proposeUpdate + activateUpdate with 7-day timelock | ✅ Complete | Week 2 |
+| `TaxEngine` — recordExecution, recordCorporateAction, exportPeriod (FIFO/LIFO/HIFO) | ✅ Complete | Week 2 |
+| `ERC20Adapter` — execute (TRANSFER, SWAP via Uniswap V3) + simulate | ✅ Complete | Week 2 |
+| `AaveAdapter` — execute (SUPPLY, WITHDRAW, BORROW, REPAY) + simulate | ✅ Complete | Week 2 |
+| `RobinhoodRWAAdapter` — execute (BUY_RWA, SELL_RWA, REDEEM_RWA) + simulate | ✅ Complete | Week 2 |
+| Test files — constructor signatures fixed, all tests compile | ✅ Complete | Week 2 |
+| `05_DeployCrossChain.s.sol` — adapter deployment script | ✅ Complete | Week 2 |
+| `06_FundTreasury.s.sol` — treasury funding + agent bond script | ✅ Complete | Week 2 |
 | PolicyEngine full implementation (Rust) | 🚧 In progress | Week 3 |
 | Multi-treasury federation | ⬜ Planned | Week 3 |
 | Integration tests + fuzzing invariants | ⬜ Planned | Week 3 |

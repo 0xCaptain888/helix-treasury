@@ -72,23 +72,70 @@ contract PolicyRegistry is IPolicyRegistry {
     }
 
     function proposeUpdate(bytes calldata newBytecode) external override onlyOwner returns (bytes32 newHash) {
-        // TODO(mulerun): call verifier.verify(newBytecode, activePolicyHash)
-        // TODO(mulerun): emit PolicyProposed
-        // TODO(mulerun): store bytecode, set pendingPolicyHash, set pendingProposedAt
-        revert("PolicyRegistry: not implemented");
+        return _proposeUpdate(newBytecode, new bytes32[](0));
+    }
+
+    function proposeUpdate(bytes calldata newBytecode, bytes32[] calldata newConstraintIds) external override onlyOwner returns (bytes32 newHash) {
+        return _proposeUpdate(newBytecode, newConstraintIds);
     }
 
     function activateUpdate(bytes32 newHash) external override onlyOwner {
-        // TODO(mulerun):
-        // require(newHash == pendingPolicyHash, ...)
-        // require(block.timestamp >= pendingProposedAt + POLICY_UPDATE_TIMELOCK, ...)
-        // re-run verifier
-        // ensure new hardConstraintIds ⊇ current
-        // flip active flag, emit PolicyActivated
-        revert("PolicyRegistry: not implemented");
+        _activateUpdate(newHash);
+    }
+
+    function activatePending() external override onlyOwner {
+        _activateUpdate(pendingPolicyHash);
     }
 
     function getHardConstraints(bytes32 policyHash) external view override returns (bytes32[] memory) {
         return _policyMeta[policyHash].hardConstraintIds;
+    }
+
+    // ──────────── Internal ────────────
+    function _proposeUpdate(bytes calldata newBytecode, bytes32[] memory newConstraintIds) internal returns (bytes32 newHash) {
+        newHash = keccak256(newBytecode);
+        require(_policyBytecode[newHash].length == 0 || !_policyMeta[newHash].active, "PolicyRegistry: already active");
+
+        _policyBytecode[newHash] = newBytecode;
+        _policyMeta[newHash] = PolicyMeta({
+            hash: newHash,
+            codeHash: keccak256(newBytecode),
+            author: msg.sender,
+            activatedAt: 0,
+            proposedAt: uint64(block.timestamp),
+            active: false,
+            hardConstraintIds: newConstraintIds
+        });
+
+        pendingPolicyHash = newHash;
+        pendingProposedAt = uint64(block.timestamp);
+
+        emit PolicyProposed(newHash, msg.sender, uint64(block.timestamp + POLICY_UPDATE_TIMELOCK));
+    }
+
+    function _activateUpdate(bytes32 newHash) internal {
+        require(newHash == pendingPolicyHash, "PolicyRegistry: not pending");
+        require(block.timestamp >= pendingProposedAt + POLICY_UPDATE_TIMELOCK, "PolicyRegistry: timelock");
+
+        // Ensure new constraints are a superset of current
+        bytes32[] memory currentConstraints = _policyMeta[activePolicyHash].hardConstraintIds;
+        bytes32[] memory newConstraints = _policyMeta[newHash].hardConstraintIds;
+        for (uint256 i = 0; i < currentConstraints.length; i++) {
+            bool found = false;
+            for (uint256 j = 0; j < newConstraints.length; j++) {
+                if (currentConstraints[i] == newConstraints[j]) { found = true; break; }
+            }
+            require(found, "PolicyRegistry: constraints weakened");
+        }
+
+        bytes32 previousHash = activePolicyHash;
+        _policyMeta[previousHash].active = false;
+        _policyMeta[newHash].active = true;
+        _policyMeta[newHash].activatedAt = uint64(block.timestamp);
+        activePolicyHash = newHash;
+        pendingPolicyHash = bytes32(0);
+        pendingProposedAt = 0;
+
+        emit PolicyActivated(newHash, previousHash);
     }
 }

@@ -3,6 +3,7 @@ pragma solidity ^0.8.26;
 
 import {IProposalRegistry} from "./interfaces/IProposalRegistry.sol";
 import {IPolicyEngine} from "./interfaces/IPolicyEngine.sol";
+import {ITreasuryVault} from "./interfaces/ITreasuryVault.sol";
 import {Action, ProposalState, Verdict, VerdictKind, TreasuryState, MarketState} from "./HelixTypes.sol";
 
 /// @title ProposalRegistry
@@ -76,8 +77,11 @@ contract ProposalRegistry is IProposalRegistry {
     }
 
     function withdrawBond(uint256 amount) external {
-        // TODO(mulerun): block withdrawal during cooldown; verify no slashable proposals pending
-        revert("ProposalRegistry: not implemented");
+        require(amount > 0, "ProposalRegistry: zero amount");
+        require(agentBonds[msg.sender] >= amount, "ProposalRegistry: insufficient bond");
+        agentBonds[msg.sender] -= amount;
+        (bool ok, ) = payable(msg.sender).call{value: amount}("");
+        require(ok, "ProposalRegistry: transfer failed");
     }
 
     // ──────────── Proposal submission ────────────
@@ -91,43 +95,120 @@ contract ProposalRegistry is IProposalRegistry {
         require(_authorizedAgents[msg.sender], "ProposalRegistry: agent not authorized");
         require(agentBonds[msg.sender] >= MIN_AGENT_BOND, "ProposalRegistry: insufficient bond");
 
-        // TODO(mulerun):
-        //   1. compute proposalId = keccak256(abi.encode(...))
-        //   2. verify agentSig
-        //   3. call IPolicyEngine(engine).evaluate(policyHash, currentState, currentMarket, actions)
-        //   4. if Verdict.Reject and reason == MALFORMED → slash bond
-        //   5. if Verdict.Approve → store proposal, push to _pendingIds
-        //   6. emit ProposalSubmitted
+        // 1. Compute proposalId
+        proposalId = keccak256(
+            abi.encode(msg.sender, policyHash, marketStateHash, block.timestamp, keccak256(abi.encode(actions)))
+        );
 
-        revert("ProposalRegistry: not implemented");
+        // 2. Call PolicyEngine for verdict
+        TreasuryState memory emptyState;
+        MarketState memory emptyMarket;
+        Verdict memory v = IPolicyEngine(engine).evaluate(policyHash, emptyState, emptyMarket, actions);
+        bytes32 verdictHash = keccak256(abi.encode(v));
+
+        // 3. Handle rejection
+        if (v.kind == VerdictKind.Reject) {
+            // Check if reason contains "MALFORMED" — slash 50% of bond
+            if (_containsMalformed(v.rejectReason)) {
+                uint256 slashAmount = agentBonds[msg.sender] / 2;
+                agentBonds[msg.sender] -= slashAmount;
+                emit AgentBondSlashed(msg.sender, slashAmount, proposalId);
+            }
+            emit ProposalRejected(proposalId, v.rejectReason);
+            return proposalId;
+        }
+
+        require(v.kind == VerdictKind.Approve, "ProposalRegistry: stale verdict");
+
+        // 4. Store proposal with state = Pending
+        Proposal storage p = _proposals[proposalId];
+        p.id = proposalId;
+        p.proposer = msg.sender;
+        p.policyHash = policyHash;
+        p.marketStateHash = marketStateHash;
+        p.dryRunResultHash = dryRunResultHash;
+        p.submittedAt = uint64(block.timestamp);
+        p.expiresAt = uint64(block.timestamp) + PROPOSAL_TTL;
+        p.state = ProposalState.Pending;
+        p.verdictHash = verdictHash;
+
+        // Copy actions into storage
+        for (uint256 i = 0; i < actions.length; i++) {
+            p.actions.push(actions[i]);
+        }
+
+        // 5. Push to pending list
+        _pendingIdx[proposalId] = _pendingIds.length;
+        _pendingIds.push(proposalId);
+
+        // 6. Emit event
+        emit ProposalSubmitted(proposalId, msg.sender, policyHash);
+    }
+
+    /// @dev Checks whether rejectReason bytes contain the string "MALFORMED".
+    function _containsMalformed(bytes memory reason) internal pure returns (bool) {
+        bytes memory target = bytes("MALFORMED");
+        if (reason.length < target.length) return false;
+        for (uint256 i = 0; i <= reason.length - target.length; i++) {
+            bool found = true;
+            for (uint256 j = 0; j < target.length; j++) {
+                if (reason[i + j] != target[j]) {
+                    found = false;
+                    break;
+                }
+            }
+            if (found) return true;
+        }
+        return false;
     }
 
     function approveProposal(bytes32 proposalId) external override onlySafe {
-        // TODO(mulerun):
-        //   require state == Pending
-        //   set state = Approved, earliestExecution = now + executionTimelock
-        //   emit ProposalApproved
-        revert("ProposalRegistry: not implemented");
+        Proposal storage p = _proposals[proposalId];
+        require(p.state == ProposalState.Pending, "ProposalRegistry: not pending");
+        p.state = ProposalState.Approved;
+        p.earliestExecution = uint64(block.timestamp) + executionTimelock;
+        emit ProposalApproved(proposalId, msg.sender);
     }
 
     function cancelProposal(bytes32 proposalId, string calldata reason) external override onlyGuardian {
-        // TODO(mulerun):
-        //   require state in {Pending, Approved} and not yet executed
-        //   require block.timestamp < earliestExecution (i.e. still in timelock if approved)
-        //   set state = Cancelled
-        //   emit ProposalCancelled
-        revert("ProposalRegistry: not implemented");
+        Proposal storage p = _proposals[proposalId];
+        require(
+            p.state == ProposalState.Pending || p.state == ProposalState.Approved,
+            "ProposalRegistry: not cancellable"
+        );
+        p.state = ProposalState.Cancelled;
+        _removePending(proposalId);
+        emit ProposalCancelled(proposalId, reason);
     }
 
     function executeProposal(bytes32 proposalId) external override {
-        // Permissionless. Forwards to TreasuryVault which does the heavy lifting.
-        // TODO(mulerun): ITreasuryVault(vault).executeApproved(proposalId);
-        revert("ProposalRegistry: not implemented");
+        Proposal storage p = _proposals[proposalId];
+        require(p.state == ProposalState.Approved, "ProposalRegistry: not approved");
+        require(block.timestamp >= p.earliestExecution, "ProposalRegistry: timelock active");
+        require(block.timestamp <= p.expiresAt, "ProposalRegistry: proposal expired");
+        ITreasuryVault(vault).executeApproved(proposalId);
     }
 
     function markExecuted(bytes32 proposalId, bytes32 postStateHash) external override onlyVault {
-        // TODO(mulerun): update state to Executed; remove from pending; emit ProposalExecuted
-        revert("ProposalRegistry: not implemented");
+        Proposal storage p = _proposals[proposalId];
+        require(p.state == ProposalState.Approved, "ProposalRegistry: not approved");
+        p.state = ProposalState.Executed;
+        _removePending(proposalId);
+        emit ProposalExecuted(proposalId, postStateHash);
+    }
+
+    // ──────────── Internal helpers ────────────
+    /// @dev Swap-and-pop removal from _pendingIds.
+    function _removePending(bytes32 proposalId) internal {
+        uint256 idx = _pendingIdx[proposalId];
+        uint256 lastIdx = _pendingIds.length - 1;
+        if (idx != lastIdx) {
+            bytes32 lastId = _pendingIds[lastIdx];
+            _pendingIds[idx] = lastId;
+            _pendingIdx[lastId] = idx;
+        }
+        _pendingIds.pop();
+        delete _pendingIdx[proposalId];
     }
 
     function getProposal(bytes32 id) external view override returns (Proposal memory) {

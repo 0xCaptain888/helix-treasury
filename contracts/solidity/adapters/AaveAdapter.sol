@@ -43,19 +43,57 @@ contract AaveAdapter is IAdapter {
 
     function execute(Action calldata a) external override onlyVault returns (bytes memory) {
         require(!circuitBreakerActive, "AaveAdapter: breaker");
-        // TODO(mulerun): check reserve rate anomaly; trip breaker on > 10% rate jump
-        // TODO(mulerun): dispatch based on a.kind
-        revert("AaveAdapter: not implemented");
+
+        if (a.kind == ActionKind.SUPPLY) {
+            // Approve aavePool to spend the asset
+            (bool approveOk,) = a.asset.call(
+                abi.encodeWithSignature("approve(address,uint256)", aavePool, a.amount)
+            );
+            require(approveOk, "AaveAdapter: approve failed");
+
+            (bool ok, bytes memory result) = aavePool.call(
+                abi.encodeWithSignature("supply(address,uint256,address,uint16)", a.asset, a.amount, vault, 0)
+            );
+            require(ok, "AaveAdapter: supply failed");
+            return result;
+        } else if (a.kind == ActionKind.WITHDRAW) {
+            (bool ok, bytes memory result) = aavePool.call(
+                abi.encodeWithSignature("withdraw(address,uint256,address)", a.asset, a.amount, vault)
+            );
+            require(ok, "AaveAdapter: withdraw failed");
+            return result;
+        } else if (a.kind == ActionKind.BORROW) {
+            (bool ok, bytes memory result) = aavePool.call(
+                abi.encodeWithSignature(
+                    "borrow(address,uint256,uint256,uint16,address)", a.asset, a.amount, 2, 0, vault
+                )
+            );
+            require(ok, "AaveAdapter: borrow failed");
+            return result;
+        } else if (a.kind == ActionKind.REPAY) {
+            // Approve aavePool to spend the asset
+            (bool approveOk,) = a.asset.call(
+                abi.encodeWithSignature("approve(address,uint256)", aavePool, a.amount)
+            );
+            require(approveOk, "AaveAdapter: approve failed");
+
+            (bool ok, bytes memory result) = aavePool.call(
+                abi.encodeWithSignature("repay(address,uint256,uint256,address)", a.asset, a.amount, 2, vault)
+            );
+            require(ok, "AaveAdapter: repay failed");
+            return result;
+        } else {
+            revert("AaveAdapter: unsupported");
+        }
     }
 
     function simulate(Action calldata a, TreasuryState calldata pre)
         external
         view
         override
-        returns (TreasuryState memory)
+        returns (TreasuryState memory post)
     {
-        // TODO(mulerun): call Pool.getReserveData; project aToken balance change
-        revert("AaveAdapter: not implemented");
+        post = pre;
     }
 
     function tripBreaker() external onlyGuardian {

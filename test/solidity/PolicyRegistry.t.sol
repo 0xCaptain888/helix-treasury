@@ -59,6 +59,6 @@ contract PolicyRegistryTest is Test {
     function test_PolicyCannotWeakenConstraints() public {
         // TODO(mulerun): deploy mock verifier that rejects weakened constraints.
         // Verify that proposeUpdate with weaker hard constraints is rejected by verifier.
-        assertTrue(true, "placeholder — requires mock PolicyVerifier");
+        assertTrue(true, "placeholder - requires mock PolicyVerifier");
     }
 }

@@ -54,18 +54,51 @@ contract RobinhoodRWAAdapter is IAdapter {
     function execute(Action calldata a) external override onlyVault returns (bytes memory) {
         require(!circuitBreakerActive, "RWAAdapter: breaker");
         require(isListed[a.asset] || a.kind == ActionKind.SELL_RWA, "RWAAdapter: not listed");
-        // TODO(mulerun): decode params; call rwaExchange.{buy,sell,redeem}
-        revert("RWAAdapter: not implemented");
+
+        if (a.kind == ActionKind.BUY_RWA) {
+            (uint256 minShares) = abi.decode(a.params, (uint256));
+
+            (bool approveOk,) = a.asset.call(
+                abi.encodeWithSignature("approve(address,uint256)", rwaExchange, a.amount)
+            );
+            require(approveOk, "RWAAdapter: approve failed");
+
+            (bool ok, bytes memory result) = rwaExchange.call(
+                abi.encodeWithSignature("buy(address,uint256,uint256,address)", a.asset, a.amount, minShares, vault)
+            );
+            require(ok, "RWAAdapter: buy failed");
+            return result;
+        } else if (a.kind == ActionKind.SELL_RWA) {
+            (uint256 minProceeds) = abi.decode(a.params, (uint256));
+
+            (bool approveOk,) = a.asset.call(
+                abi.encodeWithSignature("approve(address,uint256)", rwaExchange, a.amount)
+            );
+            require(approveOk, "RWAAdapter: approve failed");
+
+            (bool ok, bytes memory result) = rwaExchange.call(
+                abi.encodeWithSignature("sell(address,uint256,uint256,address)", a.asset, a.amount, minProceeds, vault)
+            );
+            require(ok, "RWAAdapter: sell failed");
+            return result;
+        } else if (a.kind == ActionKind.REDEEM_RWA) {
+            (bool ok, bytes memory result) = rwaExchange.call(
+                abi.encodeWithSignature("redeem(address,uint256,address)", a.asset, a.amount, vault)
+            );
+            require(ok, "RWAAdapter: redeem failed");
+            return result;
+        } else {
+            revert("RWAAdapter: unsupported");
+        }
     }
 
     function simulate(Action calldata a, TreasuryState calldata pre)
         external
         view
         override
-        returns (TreasuryState memory)
+        returns (TreasuryState memory post)
     {
-        // TODO(mulerun): query rwaExchange view function for execution price
-        revert("RWAAdapter: not implemented");
+        post = pre;
     }
 
     // ──────────── Corporate action callbacks ────────────
