@@ -63,7 +63,9 @@ const POLICY_REGISTRY_ABI = [
   { type: "function", name: "proposeUpdate", inputs: [{ type: "bytes", name: "newBytecode" }], outputs: [{ type: "bytes32", name: "newHash" }], stateMutability: "nonpayable" },
   { type: "function", name: "activateUpdate", inputs: [{ type: "bytes32", name: "newHash" }], outputs: [], stateMutability: "nonpayable" },
   { type: "function", name: "getHardConstraints", inputs: [{ type: "bytes32", name: "policyHash" }], outputs: [{ type: "bytes32[]" }], stateMutability: "view" },
-  { type: "event", name: "PolicyProposed", inputs: [{ type: "bytes32", name: "hash", indexed: true }, { type: "address", name: "by", indexed: true }, { type: "uint64", name: "earliestActivation" }] },
+  { type: "function", name: "activePolicyBytecode", inputs: [], outputs: [{ type: "bytes" }], stateMutability: "view" },
+  { type: "function", name: "activatePending", inputs: [], outputs: [], stateMutability: "nonpayable" },
+  { type: "event", name: "PolicyProposed", inputs: [{ type: "bytes32", name: "newHash", indexed: true }, { type: "bytes32", name: "previousHash", indexed: true }, { type: "address", name: "author" }] },
   { type: "event", name: "PolicyActivated", inputs: [{ type: "bytes32", name: "hash", indexed: true }, { type: "bytes32", name: "previousHash", indexed: true }] },
   { type: "event", name: "PolicyRejected", inputs: [{ type: "bytes32", name: "hash", indexed: true }, { type: "bytes", name: "reason" }] },
 ] as const;
@@ -71,7 +73,7 @@ const POLICY_REGISTRY_ABI = [
 const TAX_ENGINE_ABI = [
   { type: "function", name: "recordExecution", inputs: [{ type: "bytes32", name: "proposalId" }, { type: "tuple[]", name: "actions", components: [{ type: "uint8", name: "kind" }, { type: "address", name: "adapter" }, { type: "address", name: "asset" }, { type: "uint256", name: "amount" }, { type: "bytes", name: "params" }] }], outputs: [], stateMutability: "nonpayable" },
   { type: "function", name: "recordCorporateAction", inputs: [{ type: "address", name: "asset" }, { type: "uint8", name: "kind" }, { type: "uint256", name: "amount" }, { type: "bytes32", name: "metadata" }], outputs: [], stateMutability: "nonpayable" },
-  { type: "function", name: "exportPeriod", inputs: [{ type: "uint64", name: "startTs" }, { type: "uint64", name: "endTs" }], outputs: [{ type: "tuple[]", name: "", components: [{ type: "bytes32", name: "id" }, { type: "bytes32", name: "proposalId" }, { type: "uint64", name: "occurredAt" }, { type: "uint8", name: "kind" }, { type: "address", name: "asset" }, { type: "uint256", name: "amount" }, { type: "uint256", name: "costBasis" }, { type: "bytes8", name: "jurisdiction" }, { type: "bytes32", name: "metadata" }] }], stateMutability: "view" },
+  { type: "function", name: "exportPeriod", inputs: [{ type: "uint64", name: "startTs" }, { type: "uint64", name: "endTs" }], outputs: [{ type: "tuple[]", name: "", components: [{ type: "bytes32", name: "id" }, { type: "bytes32", name: "proposalId" }, { type: "uint64", name: "occurredAt" }, { type: "uint8", name: "kind" }, { type: "address", name: "asset" }, { type: "uint256", name: "amount" }, { type: "uint256", name: "costBasis" }, { type: "uint256", name: "proceedsUsd6" }, { type: "int256", name: "realizedPnlUsd6" }, { type: "uint8", name: "lotMethod" }, { type: "bytes8", name: "jurisdiction" }, { type: "bytes32", name: "metadata" }] }], stateMutability: "view" },
   { type: "function", name: "jurisdiction", inputs: [], outputs: [{ type: "bytes8" }], stateMutability: "view" },
   { type: "function", name: "lotMethod", inputs: [], outputs: [{ type: "uint8" }], stateMutability: "view" },
   { type: "function", name: "setJurisdiction", inputs: [{ type: "bytes8", name: "code" }], outputs: [], stateMutability: "nonpayable" },
@@ -269,8 +271,8 @@ export class HelixClient {
       token: e.asset,
       amount: BigInt(e.amount),
       costBasisUsdc: BigInt(e.costBasis),
-      proceedsUsdc: 0n,
-      gainLossUsdc: 0n,
+      proceedsUsdc: BigInt(e.proceedsUsd6 ?? 0),
+      gainLossUsdc: BigInt(e.realizedPnlUsd6 ?? 0),
       timestamp: Number(e.occurredAt),
       txHash: "0x" as `0x${string}`,
     }));

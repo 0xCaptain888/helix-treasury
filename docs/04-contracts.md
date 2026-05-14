@@ -436,10 +436,14 @@ interface ITaxEngine {
     }
 
     function recordExecution(bytes32 proposalId, Action[] calldata actions) external;
+    function recordCorporateAction(address asset, TaxEventKind kind, uint256 amount, bytes32 metadata) external;
     function exportPeriod(uint64 startTs, uint64 endTs) external view returns (TaxEvent[] memory);
 
     function setJurisdiction(bytes8 code) external; // safe
     function setLotMethod(uint8 method) external; // safe; FIFO=0, LIFO=1, HIFO=2
+
+    function jurisdiction() external view returns (bytes8);
+    function lotMethod() external view returns (uint8);
 }
 ```
 
