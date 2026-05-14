@@ -260,9 +260,8 @@ helix/
 | On-chain verification (pause/unpause, bond, breaker, timelock) | ✅ Complete | Week 2 |
 | On-chain interaction suite (80 txns: deposits, withdrawals, drills, config) | ✅ Complete | Week 2 |
 | Mock token deployment (mUSDC, mWETH, mARB, mSPY, mTBILL) | ✅ Complete | Week 2 |
-| PolicyEngine full implementation (Rust) | 🚧 In progress | Week 3 |
-| Multi-treasury federation | ⬜ Planned | Week 3 |
-| Integration tests + fuzzing invariants | ⬜ Planned | Week 3 |
+| PolicyEngine full implementation (Rust) | ✅ Complete | Week 3 |
+| Integration tests + fuzzing invariants (32 tests, 256 fuzz runs) | ✅ Complete | Week 3 |
 | Submission | ⬜ | **2026-06-14** |
 
 Mainnet deployment is **explicitly gated** on third-party audit (Trail of Bits / OpenZeppelin) and Immunefi bug bounty launch. Target mainnet: Q3 2026. See [docs/05-security-model.md](./docs/05-security-model.md) for our security posture.
