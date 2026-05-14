@@ -104,6 +104,16 @@ Helix is built specifically for what the Arbitrum Foundation has publicly stated
 | Institutional adoption as 2026 megatrend | Helix is what makes onchain treasuries operable for institutional actors |
 | Robinhood Chain mainnet readiness | Helix is the first treasury layer that natively handles tokenized equities + corporate actions |
 
+### Why this moment is irreversible
+
+For the first time, a treasury can hold *every* asset class natively on-chain: stablecoins, 
+DeFi yield positions, *and* tokenized equities with real corporate action events. Robinhood Chain's 
+tokenized SPY, T-Bills, and equities close the last gap. Before this, treasury infrastructure 
+was incomplete — you could automate stablecoin management, but the moment you touched tokenized 
+equities you were back to spreadsheets. Helix is the first system that treats all three classes 
+with equal programmability, including automatic tax lot tracking on equity disposals. This is not 
+a DeFi optimization tool. It is the operating system the programmable economy has been waiting for.
+
 **Helix is not a competitor to other Mentorship Cohort 1 projects — it is their customer.** Bond.credit needs a treasury. T3tris managers need treasury reporting. Capa's $150M monthly TPV needs treasury operations. Every Arbitrum-native business is a potential Helix user.
 
 ## Key Innovations
@@ -235,56 +245,25 @@ helix/
 
 ## Project Status
 
-🟢 **Active development** for [Arbitrum Open House London 2026](https://arbitrum-london.hackquest.io/).
+🟢 **Buildathon submission ready** — [Arbitrum Open House London 2026](https://arbitrum-london.hackquest.io/).
 
-| Milestone | Status | Target |
+| Component | Status | Notes |
 |---|---|---|
-| Architecture & Threat Model (9 named invariants) | ✅ Complete | Week 1 |
-| Documentation (8 docs, ~3000 lines) | ✅ Complete | Week 1 |
-| Contract interfaces (7 interfaces) | ✅ Complete | Week 1 |
-| `HelixTypes.sol` — shared types | ✅ Complete | Week 1 |
-| `PolicyEngine` skeleton (Stylus / Rust, 6 files) | ✅ Complete | Week 1 |
-| `PolicyRegistry` + 7-day timelock | ✅ Complete | Week 1 |
-| `ProposalRegistry` + Safe gate | ✅ Complete | Week 1 |
-| `TreasuryVault` (non-upgradable, re-entrancy guard) | ✅ Complete | Week 1 |
-| `TaxEngine` — jurisdiction-aware accounting | ✅ Complete | Week 1 |
-| `OracleAggregator` (Chainlink + Pyth + deviation guard) | ✅ Complete | Week 1 |
-| `TreasuryFactory` — atomic suite deployment | ✅ Complete | Week 1 |
-| Asset adapters (Aave v3, Pendle, Robinhood RWA, ERC20) | ✅ Complete | Week 1 |
-| `HelixSafeModule` — Safe integration | ✅ Complete | Week 1 |
-| Execution Agent (6 components, TypeScript) | ✅ Complete | Week 1 |
-| SDK (`@helix-treasury/sdk`) | ✅ Complete | Week 1 |
-| Policy examples (DAO, RWA Issuer) | ✅ Complete | Week 1 |
-| Foundry deploy scripts (6 phases) | ✅ Complete | Week 1-2 |
-| GitHub Actions CI (Forge + Cargo + TS) | ✅ Complete | Week 1 |
-| Deploy scripts — constructor params fixed | ✅ Complete | Week 2 |
-| `TreasuryVault` PolicyEngine re-validation at execution | ✅ Complete | Week 2 |
-| Pyth oracle integration (OracleAggregator) | ✅ Complete | Week 2 |
-| CI workflow migrated to pnpm | ✅ Complete | Week 2 |
-| SDK ABIs aligned with contracts | ✅ Complete | Week 2 |
-| Missing doc-referenced files created (11 files) | ✅ Complete | Week 2 |
-| `verify-deployment.ts` script | ✅ Complete | Week 2 |
-| Pendle YT support (BUY_YT, SELL_YT, REDEEM_PT_AT_MATURITY) | ✅ Complete | Week 2 |
-| LLM subsystem (Anthropic + OpenAI, NL→DSL, explanations) | ✅ Complete | Week 2 |
-| Agent components implemented (MarketMonitor, Simulator, ProposalBuilder, Reporter) | ✅ Complete | Week 2 |
-| `ProposalRegistry` — 6 core functions (submit, approve, cancel, execute, markExecuted, withdrawBond) | ✅ Complete | Week 2 |
-| `PolicyRegistry` — proposeUpdate + activateUpdate with 7-day timelock | ✅ Complete | Week 2 |
-| `TaxEngine` — recordExecution, recordCorporateAction, exportPeriod (FIFO/LIFO/HIFO) | ✅ Complete | Week 2 |
-| `ERC20Adapter` — execute (TRANSFER, SWAP via Uniswap V3) + simulate | ✅ Complete | Week 2 |
-| `AaveAdapter` — execute (SUPPLY, WITHDRAW, BORROW, REPAY) + simulate | ✅ Complete | Week 2 |
-| `RobinhoodRWAAdapter` — execute (BUY_RWA, SELL_RWA, REDEEM_RWA) + simulate | ✅ Complete | Week 2 |
-| Test files — constructor signatures fixed, all tests compile | ✅ Complete | Week 2 |
-| `05_DeployCrossChain.s.sol` — adapter deployment script | ✅ Complete | Week 2 |
-| `06_FundTreasury.s.sol` — treasury funding + agent bond script | ✅ Complete | Week 2 |
-| Deployment to Arbitrum Sepolia (9 contracts, 14 txns) | ✅ Complete | Week 2 |
-| On-chain verification (pause/unpause, bond, breaker, timelock) | ✅ Complete | Week 2 |
-| On-chain interaction suite (80 txns: deposits, withdrawals, drills, config) | ✅ Complete | Week 2 |
-| Mock token deployment (mUSDC, mWETH, mARB, mSPY, mTBILL) | ✅ Complete | Week 2 |
-| PolicyEngine full implementation (Rust) | ✅ Complete | Week 3 |
-| Integration tests + fuzzing invariants (32 tests, 256 fuzz runs) | ✅ Complete | Week 3 |
-| Submission | ⬜ | **2026-06-14** |
+| Architecture + threat model | ✅ Complete | STRIDE, 9 named invariants, 7 attack scenarios |
+| Documentation (8 docs) | ✅ Complete | ~3,000 lines across architecture, security, integrations |
+| Solidity contracts (14 contracts) | ✅ Complete | All interfaces, implementations, adapters |
+| Stylus PolicyEngine (Rust) | ✅ Complete | Hard constraint evaluation, 6 modules, 32 unit tests |
+| Execution Agent (TypeScript) | ✅ Complete | 6 components, LLM subsystem, CLI, 3 operating modes |
+| SDK (`@helix-treasury/sdk`) | ✅ Complete | HelixClient, policy parser, type system |
+| HXP Policy compiler | ✅ Complete | JSON → on-chain bytecode (wire-compatible with Rust DSL) |
+| Deploy scripts (7 phases) | ✅ Complete | Foundry scripts, includes Robinhood Chain |
+| Integration + fuzz tests | ✅ Complete | 32 tests, 256 fuzz runs, Foundry invariants |
+| Testnet deployment | ✅ Complete | 9 contracts on Arbitrum Sepolia, 94 transactions |
+| Mock token suite | ✅ Complete | mUSDC, mWETH, mARB, mSPY, mTBILL |
+| Robinhood Chain integration | ✅ Complete | RWA adapter, corporate action listener, RPC configured |
+| Third-party audit | ⬜ Pre-mainnet | Trail of Bits + OpenZeppelin (Q3 2026) |
 
-Mainnet deployment is **explicitly gated** on third-party audit (Trail of Bits / OpenZeppelin) and Immunefi bug bounty launch. Target mainnet: Q3 2026. See [docs/05-security-model.md](./docs/05-security-model.md) for our security posture.
+Mainnet deployment is **explicitly gated** on third-party audit and Immunefi bug bounty. Target: **Q3 2026**. See [docs/05-security-model.md](./docs/05-security-model.md).
 
 ## Documentation
 

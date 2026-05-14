@@ -170,26 +170,83 @@ Output: `deployments/arbitrum-sepolia/treasury-0001.json` (treasury contract add
 
 ## 5. Deploy to Robinhood Chain Testnet
 
-Robinhood Chain testnet is an Arbitrum Orbit chain. The deployment process is identical, with chain-specific replacements:
+Robinhood Chain testnet is an Arbitrum Orbit L2. The deployment uses a dedicated script
+that handles chain-specific configuration — particularly the absence of Chainlink feeds
+(Robinhood Chain uses its own RWA pricing oracle) and the presence of native tokenized
+equity assets (SPY, TBILL, AAPL).
+
+### 5.1 Configure environment
+
+Add to your `.env`:
+
+```env
+ROBINHOOD_TESTNET_RPC=https://rpc.testnet.chain.robinhood.com
+ROBINHOOD_TESTNET_WS=wss://feed.testnet.chain.robinhood.com
+```
+
+### 5.2 Run the Robinhood Chain deploy script
 
 ```bash
-forge script scripts/01_DeployFoundations.s.sol \
+forge script scripts/solidity/07_DeployRobinhoodChain.s.sol \
   --rpc-url $ROBINHOOD_TESTNET_RPC \
   --private-key $DEPLOYER_PK \
   --broadcast
 ```
 
-Differences:
+This deploys:
+- `OracleAggregator` (Pyth-only; no Chainlink on RBC testnet)
+- `TreasuryFactory`
+- `TreasuryVault` + `TaxEngine` (via factory, US_FIFO jurisdiction)
+
+Deployed addresses are written to `deployments/robinhood-testnet.json`.
+
+### 5.3 Register RWA tokens
+
+After deployment, register the native RWA tokens (addresses from Robinhood Chain docs):
+
+```bash
+# Register tokenized SPY ETF
+cast send $RBC_VAULT \
+  "registerAsset((address,uint8,uint8,bool,bool,address,bool))" \
+  "($RBC_SPY_ADDRESS,18,2,false,false,$RBC_RWA_ADAPTER,true)" \
+  --rpc-url $ROBINHOOD_TESTNET_RPC \
+  --private-key $SAFE_PK
+
+# Register tokenized T-Bill
+cast send $RBC_VAULT \
+  "registerAsset((address,uint8,uint8,bool,bool,address,bool))" \
+  "($RBC_TBILL_ADDRESS,18,2,false,false,$RBC_RWA_ADAPTER,true)" \
+  --rpc-url $ROBINHOOD_TESTNET_RPC \
+  --private-key $SAFE_PK
+```
+
+### 5.4 Configure RobinhoodRWAAdapter
+
+The `RobinhoodRWAAdapter` includes a `CorporateActionListener` that subscribes to
+Robinhood Chain's on-chain corporate action events (dividends, stock splits, mergers).
+Configure it after deployment:
+
+```bash
+cast send $RBC_RWA_ADAPTER \
+  "setVault(address)" $RBC_VAULT \
+  --rpc-url $ROBINHOOD_TESTNET_RPC \
+  --private-key $DEPLOYER_PK
+```
+
+### 5.5 Differences from Arbitrum Sepolia
 
 | Item | Arbitrum Sepolia | Robinhood Chain testnet |
 |---|---|---|
-| Native gas token | ETH | (per Robinhood Chain docs; may differ) |
-| Oracle feeds | Chainlink + Pyth | Chainlink + Robinhood's RWA-pricing oracle |
-| Available adapters | All | `RobinhoodRWAAdapter` enabled with real RWA assets |
-| Block explorer | Arbiscan | Robinhood Chain explorer |
-| Faucet | Standard | Robinhood Chain faucet |
+| Oracle sources | Chainlink + Pyth | Pyth only (+ RBC native oracle) |
+| Native RWA assets | Mock tokens (mSPY, mTBILL) | Real tokenized SPY, TBILL, AAPL |
+| Corporate actions | Simulated via mock | Real on-chain events from Robinhood Chain |
+| Gas token | Sepolia ETH | Per Robinhood Chain docs |
+| Block explorer | Arbiscan Sepolia | Robinhood Chain explorer |
+| Deployment addresses | `deployments/arbitrum-sepolia.json` | `deployments/robinhood-testnet.json` |
 
-⚠️ The `RobinhoodRWAAdapter` is only enabled on Robinhood Chain. On Arbitrum Sepolia, calls to it revert.
+⚠️ PolicyEngine remains on Arbitrum Sepolia. The Robinhood Chain vault calls the
+Arbitrum-side engine via cross-chain messaging for policy evaluation. This is by design —
+one PolicyEngine serves all chains.
 
 ## 6. Cross-Chain Coordination (v0.5)
 

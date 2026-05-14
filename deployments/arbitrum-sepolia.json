@@ -1,0 +1,104 @@
+{
+  "network": "arbitrum-sepolia",
+  "chainId": 421614,
+  "deployedAt": "2026-05-14",
+  "deployedBy": "0x2F9fDE6B6FB8d7353aB80F082f85F0d70B809C3b",
+  "commitHash": "fill-in-after-verification",
+  "rpcUrl": "https://sepolia-rollup.arbitrum.io/rpc",
+  "blockExplorer": "https://sepolia.arbiscan.io",
+  "contracts": {
+    "OracleAggregator": {
+      "address": "0x6F4DF8979a8f18Ce3fD2ff941e5a3610E5cAfCa5",
+      "arbiscan": "https://sepolia.arbiscan.io/address/0x6F4DF8979a8f18Ce3fD2ff941e5a3610E5cAfCa5",
+      "verified": false
+    },
+    "PolicyRegistry": {
+      "address": "0x7058132Ba4aE19983c61590644F2943A3B7fDf80",
+      "arbiscan": "https://sepolia.arbiscan.io/address/0x7058132Ba4aE19983c61590644F2943A3B7fDf80",
+      "verified": false
+    },
+    "ProposalRegistry": {
+      "address": "0x494960e21058290BB2F1328b6b837dCF26aA5DCb",
+      "arbiscan": "https://sepolia.arbiscan.io/address/0x494960e21058290BB2F1328b6b837dCF26aA5DCb",
+      "verified": false
+    },
+    "TreasuryVault": {
+      "address": "0x2A46cF6493b377D45908254B0528e38990AA323f",
+      "arbiscan": "https://sepolia.arbiscan.io/address/0x2A46cF6493b377D45908254B0528e38990AA323f",
+      "verified": false
+    },
+    "TaxEngine": {
+      "address": "0x8a8C3532359aAACb6C3a1060deF4938F6006c8F1",
+      "arbiscan": "https://sepolia.arbiscan.io/address/0x8a8C3532359aAACb6C3a1060deF4938F6006c8F1",
+      "verified": false
+    },
+    "ERC20Adapter": {
+      "address": "0x77472dADA40B8c30304a7FbbAf14e1b200A5c7FE",
+      "arbiscan": "https://sepolia.arbiscan.io/address/0x77472dADA40B8c30304a7FbbAf14e1b200A5c7FE",
+      "verified": false
+    },
+    "AaveAdapter": {
+      "address": "0x1D77BBE8E921604c47CAb229Fc0727C5967F19a8",
+      "arbiscan": "https://sepolia.arbiscan.io/address/0x1D77BBE8E921604c47CAb229Fc0727C5967F19a8",
+      "verified": false
+    },
+    "PendleAdapter": {
+      "address": "0x759aE549389eeDf1F055606fD9b72d071c7Ac3fa",
+      "arbiscan": "https://sepolia.arbiscan.io/address/0x759aE549389eeDf1F055606fD9b72d071c7Ac3fa",
+      "verified": false
+    },
+    "RobinhoodRWAAdapter": {
+      "address": "0x41d158986CDAd44c7275A681a05215c9Aa1cAe1e",
+      "arbiscan": "https://sepolia.arbiscan.io/address/0x41d158986CDAd44c7275A681a05215c9Aa1cAe1e",
+      "verified": false
+    }
+  },
+  "mockTokens": {
+    "mUSDC": {
+      "address": "0x9582d2dF303ec2B1fab104A77E249C05571fccC9",
+      "decimals": 6,
+      "symbol": "mUSDC",
+      "description": "Mock USDC for testnet interaction"
+    },
+    "mWETH": {
+      "address": "0x185346Bd15223740dA8D6D7A11F18b1c93971525",
+      "decimals": 18,
+      "symbol": "mWETH",
+      "description": "Mock WETH for testnet interaction"
+    },
+    "mARB": {
+      "address": "0xfcc6bE4Dfc45322b8C99fFFB255C1DEcd8f07907",
+      "decimals": 18,
+      "symbol": "mARB",
+      "description": "Mock ARB for testnet interaction"
+    },
+    "mSPY": {
+      "address": "0x2fc6e0987bF58F5A0Dc76801A9556Ab62bD42049",
+      "decimals": 18,
+      "symbol": "mSPY",
+      "description": "Mock tokenized SPY ETF"
+    },
+    "mTBILL": {
+      "address": "0x2A7D252D0bFF31eC1098FF642C0934b7124a5A33",
+      "decimals": 18,
+      "symbol": "mTBILL",
+      "description": "Mock tokenized 3-month T-Bill"
+    }
+  },
+  "operationalAddresses": {
+    "safe": "0x2F9fDE6B6FB8d7353aB80F082f85F0d70B809C3b",
+    "guardian": "0xC7e424c1E4B346c06A35241e7BCa469477483683",
+    "agent": "0x4c9Cef3bc7F5455d2581b717f115B2c76Fc1d092"
+  },
+  "vaultHoldings": {
+    "mUSDC": "340000",
+    "mWETH": "55",
+    "mARB": "150000",
+    "mSPY": "700",
+    "mTBILL": "150000",
+    "totalTransactions": 94,
+    "deploymentTransactions": 14,
+    "interactionTransactions": 80
+  },
+  "notes": "Run `bash scripts/ts/verify-contracts.sh` after setting ARBISCAN_API_KEY to verify source on Arbiscan. Update 'verified' fields to true after verification."
+}
