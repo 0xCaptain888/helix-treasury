@@ -3,7 +3,7 @@
   "chainId": 421614,
   "deployedAt": "2026-05-14",
   "deployedBy": "0x2F9fDE6B6FB8d7353aB80F082f85F0d70B809C3b",
-  "commitHash": "fill-in-after-verification",
+  "commitHash": "45dddfe250a76e0eb1ba6eb36f75e1e84f81a1f0",
   "rpcUrl": "https://sepolia-rollup.arbitrum.io/rpc",
   "blockExplorer": "https://sepolia.arbiscan.io",
   "contracts": {
