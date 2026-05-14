@@ -1,0 +1,40 @@
+# Helix Execution Agent — example configuration.
+# Copy to `config.yaml` and fill in your treasury's values.
+# See docs/03-execution-agent.md §8 for full reference.
+
+treasury:
+  vault_address: "0x0000000000000000000000000000000000000000"
+  policy_registry: "0x0000000000000000000000000000000000000000"
+  proposal_registry: "0x0000000000000000000000000000000000000000"
+
+chain:
+  primary: arbitrum-sepolia
+  rpc_urls:
+    - "https://sepolia-rollup.arbitrum.io/rpc"
+  fallback_rpc: []
+
+agent:
+  # `env` is OK for testnet; production should use aws-kms / gcp-kms / hashicorp-vault
+  key_source: env
+  tick_interval: 4h
+  modes:
+    - monitoring     # safe default for first 30 days
+    # - proposing    # uncomment to allow on-chain submission
+    # - emergency    # only enabled by guardian during incidents
+
+llm:
+  provider: anthropic
+  model: claude-sonnet
+  enabled_features:
+    - proposal_explanation
+    - nl_to_dsl
+
+oracles:
+  primary: chainlink
+  secondary: pyth
+  max_staleness: 30m
+
+reporting:
+  discord_webhook: ""
+  slack_webhook: ""
+  email: ""

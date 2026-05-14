@@ -1,0 +1,36 @@
+{
+  "name": "helix",
+  "version": "0.5.0-alpha",
+  "private": true,
+  "description": "The Programmable Treasury OS for the Onchain Economy",
+  "license": "MIT",
+  "workspaces": [
+    "agent",
+    "sdk"
+  ],
+  "scripts": {
+    "build": "pnpm -r build",
+    "test": "pnpm -r test && forge test",
+    "test:contracts": "forge test -vvv",
+    "test:agent": "pnpm --filter @helix/agent test",
+    "test:sdk": "pnpm --filter @helix/sdk test",
+    "lint": "pnpm -r lint && forge fmt --check",
+    "format": "pnpm -r format && forge fmt",
+    "deploy:sepolia": "forge script scripts/solidity/01_DeployFoundations.s.sol --rpc-url arbitrum_sepolia --broadcast --verify",
+    "deploy:robinhood": "forge script scripts/solidity/01_DeployFoundations.s.sol --rpc-url robinhood_testnet --broadcast",
+    "verify:deployment": "tsx scripts/ts/verify-deployment.ts",
+    "cli": "tsx agent/src/cli/index.ts",
+    "agent:start": "pnpm --filter @helix/agent start",
+    "agent:dev": "pnpm --filter @helix/agent dev"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "prettier": "^3.2.0",
+    "tsx": "^4.7.0",
+    "typescript": "^5.4.0"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=9.0.0"
+  }
+}

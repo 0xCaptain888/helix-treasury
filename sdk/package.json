@@ -1,0 +1,31 @@
+{
+  "name": "@helix/sdk",
+  "version": "0.5.0-alpha",
+  "private": true,
+  "type": "module",
+  "description": "Typed client SDK for Helix treasuries",
+  "license": "MIT",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run",
+    "lint": "eslint src --ext .ts"
+  },
+  "dependencies": {
+    "viem": "^2.21.0",
+    "zod": "^3.23.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "typescript": "^5.4.0",
+    "vitest": "^2.0.0"
+  },
+  "files": ["dist", "README.md"]
+}

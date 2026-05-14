@@ -1,0 +1,43 @@
+{
+  "name": "@helix/agent",
+  "version": "0.5.0-alpha",
+  "private": true,
+  "type": "module",
+  "description": "Helix Execution Agent — monitors, simulates, proposes treasury actions",
+  "license": "MIT",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "helix-agent": "dist/index.js",
+    "helix-cli": "dist/cli/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "tsx watch src/index.ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint src --ext .ts",
+    "format": "prettier --write \"src/**/*.ts\""
+  },
+  "dependencies": {
+    "viem": "^2.21.0",
+    "@safe-global/protocol-kit": "^4.0.0",
+    "@safe-global/api-kit": "^2.4.0",
+    "@anthropic-ai/sdk": "^0.30.0",
+    "openai": "^4.65.0",
+    "yaml": "^2.5.0",
+    "pino": "^9.4.0",
+    "pino-pretty": "^11.2.0",
+    "zod": "^3.23.0",
+    "commander": "^12.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "eslint": "^8.57.0",
+    "prettier": "^3.2.0",
+    "tsx": "^4.7.0",
+    "typescript": "^5.4.0",
+    "vitest": "^2.0.0"
+  }
+}

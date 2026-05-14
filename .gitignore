@@ -1,0 +1,52 @@
+# Env
+.env
+.env.local
+.env.*.local
+
+# Node
+node_modules/
+dist/
+build/
+.turbo/
+pnpm-debug.log*
+
+# Foundry
+cache/
+out/
+broadcast/
+foundry.toml.bak
+
+# Rust / Stylus
+target/
+Cargo.lock
+*.wasm
+*.wat
+*.wasm.gz
+
+# Logs
+logs/
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.iml
+
+# Deployment artifacts
+deployments/local/
+
+# Coverage
+coverage/
+lcov.info
+
+# Generated docs
+docs/api/
+
+# Local secrets
+*.pem
+*.key
+secrets/

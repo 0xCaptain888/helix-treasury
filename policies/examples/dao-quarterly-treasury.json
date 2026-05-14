@@ -1,0 +1,125 @@
+{
+  "version": "0.1",
+  "name": "dao-quarterly-treasury-v1",
+  "description": "Quarterly treasury management policy for a mid-size DAO. Prioritizes 12-month runway preservation, yield optimization on excess reserves, and capped RWA exposure via Robinhood Chain tokenized assets.",
+  "treasury": "0x0000000000000000000000000000000000000000",
+
+  "hard_constraints": [
+    {
+      "id": "HC-01",
+      "kind": "RUNWAY_FLOOR_DAYS",
+      "params": {
+        "days": 365,
+        "comment": "Always maintain 12 months operating runway in stablecoins. Inviolable — agent cannot propose any action that reduces stable balance below this floor, even temporarily."
+      }
+    },
+    {
+      "id": "HC-02",
+      "kind": "MAX_SINGLE_ALLOCATION",
+      "params": {
+        "max_bps": 4000,
+        "comment": "No single non-stable asset may exceed 40% of NAV. Prevents concentration risk."
+      }
+    },
+    {
+      "id": "HC-03",
+      "kind": "MIN_LIQUIDITY_RATIO",
+      "params": {
+        "min_bps": 2000,
+        "comment": "At least 20% of NAV must remain in instantly-liquid assets (USDC, ETH, ARB on-vault — not wrapped in protocols)."
+      }
+    },
+    {
+      "id": "HC-04",
+      "kind": "MAX_COUNTERPARTY_EXPOSURE",
+      "params": {
+        "max_bps": 3000,
+        "comment": "Max 30% NAV exposure to any single protocol counterparty (Aave, Pendle, Robinhood)."
+      }
+    },
+    {
+      "id": "HC-05",
+      "kind": "MAX_DAILY_MOVEMENT",
+      "params": {
+        "max_bps": 1000,
+        "comment": "Agent may not propose moving more than 10% of NAV in any 24-hour window. Limits blast radius of compromised agent key."
+      }
+    },
+    {
+      "id": "HC-06",
+      "kind": "STABLECOIN_FLOOR_RATIO",
+      "params": {
+        "min_bps": 5000,
+        "comment": "Stablecoins (USDC, USDT, DAI) must comprise at least 50% of NAV. This DAO has quarterly payroll obligations."
+      }
+    }
+  ],
+
+  "soft_policies": [
+    {
+      "id": "SP-01",
+      "kind": "YIELD_OPTIMIZATION",
+      "priority": 10,
+      "params": {
+        "target": "AAVE_USDC",
+        "allocation_bps": 2000,
+        "min_apy_bps": 300,
+        "comment": "Deposit 20% of NAV into Aave USDC if supply APY ≥ 3%. Priority 10 = highest; evaluated first."
+      }
+    },
+    {
+      "id": "SP-02",
+      "kind": "PENDLE_YIELD_CURVE",
+      "priority": 20,
+      "params": {
+        "market": "PENDLE_USDC_3M",
+        "allocation_bps": 1000,
+        "min_implied_apy_bps": 500,
+        "max_duration_days": 90,
+        "comment": "Buy 3-month USDC PT on Pendle with 10% of NAV if implied APY ≥ 5%. Fixed-rate locking to match quarterly payroll cycles."
+      }
+    },
+    {
+      "id": "SP-03",
+      "kind": "RWA_ALLOCATION",
+      "priority": 30,
+      "params": {
+        "rwa_token": "RH_TBILL_3M",
+        "allocation_bps": 1500,
+        "min_yield_bps": 400,
+        "chain": "robinhood_testnet",
+        "comment": "Allocate 15% of NAV to Robinhood Chain 3-month T-Bill token if yield ≥ 4%. Exposure to real-world yield with daily liquidity."
+      }
+    },
+    {
+      "id": "SP-04",
+      "kind": "REBALANCE_BAND",
+      "priority": 40,
+      "params": {
+        "asset": "ARB",
+        "target_bps": 500,
+        "band_bps": 200,
+        "comment": "Keep ARB between 3%-7% of NAV. If outside band, agent proposes rebalance. Native token exposure for governance participation."
+      }
+    },
+    {
+      "id": "SP-05",
+      "kind": "RUNWAY_EXTENSION",
+      "priority": 50,
+      "params": {
+        "target_runway_days": 730,
+        "accumulation_rate_bps": 500,
+        "comment": "If current runway < 24 months, direct 5% of any incoming revenue to USDC accumulation until 730-day runway achieved. Priority 50 = lowest; only applied after higher-priority policies are satisfied."
+      }
+    }
+  ],
+
+  "metadata": {
+    "author": "Helix DAO Treasury Committee",
+    "created_at": "2026-05-25",
+    "tags": ["dao", "quarterly", "rwa", "pendle", "aave", "arbitrum"],
+    "review_schedule": "quarterly",
+    "next_review": "2026-09-01",
+    "governance_proposal": "https://snapshot.org/#/helix-dao/proposal/0x..."
+  }
+}

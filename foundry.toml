@@ -1,0 +1,29 @@
+[profile.default]
+src = "contracts/solidity"
+out = "out"
+libs = ["lib"]
+test = "test/solidity"
+script = "scripts/solidity"
+
+solc_version = "0.8.26"
+optimizer = true
+optimizer_runs = 200
+via_ir = true
+
+# Stylus contracts live in contracts/stylus and are built separately with cargo-stylus
+
+[profile.ci]
+fuzz = { runs = 10000 }
+invariant = { runs = 1000, depth = 64 }
+
+[fmt]
+line_length = 100
+tab_width = 4
+quote_style = "double"
+
+[rpc_endpoints]
+arbitrum_sepolia = "${ARB_SEPOLIA_RPC}"
+robinhood_testnet = "${ROBINHOOD_TESTNET_RPC}"
+
+[etherscan]
+arbitrum_sepolia = { key = "${ARBISCAN_API_KEY}", chain = 421614 }

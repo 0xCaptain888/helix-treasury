@@ -1,0 +1,84 @@
+{
+  "version": "0.1",
+  "name": "rwa-issuer-conservative-v1",
+  "description": "Conservative treasury policy for a tokenized RWA issuer on Robinhood Chain. Compliance-first: strict counterparty limits, full auditability, jurisdiction-aware tax accounting. Designed to satisfy institutional LP requirements.",
+  "treasury": "0x0000000000000000000000000000000000000000",
+
+  "hard_constraints": [
+    {
+      "id": "HC-01",
+      "kind": "RUNWAY_FLOOR_DAYS",
+      "params": { "days": 540, "comment": "18-month runway floor — institutional LP covenant requirement." }
+    },
+    {
+      "id": "HC-02",
+      "kind": "MAX_SINGLE_ALLOCATION",
+      "params": { "max_bps": 2500, "comment": "Max 25% in any single asset. Stricter than DAO policy — issuer has fiduciary obligations." }
+    },
+    {
+      "id": "HC-03",
+      "kind": "MIN_LIQUIDITY_RATIO",
+      "params": { "min_bps": 4000, "comment": "40% liquid — needed to honor token redemptions within 24h." }
+    },
+    {
+      "id": "HC-04",
+      "kind": "MAX_COUNTERPARTY_EXPOSURE",
+      "params": { "max_bps": 2000, "comment": "20% per counterparty — regulated entity requirement." }
+    },
+    {
+      "id": "HC-05",
+      "kind": "MAX_DAILY_MOVEMENT",
+      "params": { "max_bps": 500, "comment": "5% per day — strict for regulated entity." }
+    },
+    {
+      "id": "HC-06",
+      "kind": "STABLECOIN_FLOOR_RATIO",
+      "params": { "min_bps": 6000, "comment": "60% stablecoins minimum — redemption buffer." }
+    }
+  ],
+
+  "soft_policies": [
+    {
+      "id": "SP-01",
+      "kind": "RWA_ALLOCATION",
+      "priority": 10,
+      "params": {
+        "rwa_token": "RH_TBILL_6M",
+        "allocation_bps": 2000,
+        "min_yield_bps": 350,
+        "chain": "robinhood_testnet",
+        "comment": "6-month T-Bills as primary yield vehicle. Matches issuer's typical lockup horizon."
+      }
+    },
+    {
+      "id": "SP-02",
+      "kind": "YIELD_OPTIMIZATION",
+      "priority": 20,
+      "params": {
+        "target": "AAVE_USDC",
+        "allocation_bps": 1500,
+        "min_apy_bps": 250,
+        "comment": "Idle USDC earns Aave yield while awaiting deployment."
+      }
+    },
+    {
+      "id": "SP-03",
+      "kind": "REBALANCE_BAND",
+      "priority": 30,
+      "params": {
+        "asset": "USDC",
+        "target_bps": 6500,
+        "band_bps": 500,
+        "comment": "USDC at 60-70% of NAV. If below 60%, sell RWA positions to rebalance."
+      }
+    }
+  ],
+
+  "metadata": {
+    "author": "RWA Issuer Treasury Ops",
+    "created_at": "2026-05-25",
+    "tags": ["rwa-issuer", "institutional", "conservative", "compliance", "robinhood-chain"],
+    "tax_jurisdiction": "US_FIFO",
+    "review_schedule": "monthly"
+  }
+}
