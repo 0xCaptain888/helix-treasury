@@ -15,6 +15,9 @@ interface ITaxEngine {
         address asset;
         uint256 amount;
         uint256 costBasis;
+        uint256 proceedsUsd6;      // proceeds in USD 6-decimal
+        int256  realizedPnlUsd6;   // realized PnL in USD 6-decimal
+        uint8   lotMethod;         // 0=FIFO, 1=LIFO, 2=HIFO at time of event
         bytes8 jurisdiction; // ISO-3166-1 alpha-2
         bytes32 metadata; // hash of extended off-chain metadata
     }

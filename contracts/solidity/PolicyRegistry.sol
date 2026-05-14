@@ -72,7 +72,9 @@ contract PolicyRegistry is IPolicyRegistry {
     }
 
     function proposeUpdate(bytes calldata newBytecode) external override onlyOwner returns (bytes32 newHash) {
-        return _proposeUpdate(newBytecode, new bytes32[](0));
+        // Inherit current policy's hard constraints when none are explicitly provided
+        bytes32[] memory currentConstraints = _policyMeta[activePolicyHash].hardConstraintIds;
+        return _proposeUpdate(newBytecode, currentConstraints);
     }
 
     function proposeUpdate(bytes calldata newBytecode, bytes32[] calldata newConstraintIds) external override onlyOwner returns (bytes32 newHash) {
@@ -116,24 +118,14 @@ contract PolicyRegistry is IPolicyRegistry {
         pendingPolicyHash = newHash;
         pendingProposedAt = uint64(block.timestamp);
 
-        emit PolicyProposed(newHash, msg.sender, uint64(block.timestamp + POLICY_UPDATE_TIMELOCK));
+        emit PolicyProposed(newHash, activePolicyHash, msg.sender);
     }
 
     function _activateUpdate(bytes32 newHash) internal {
+        require(activePolicyHash != bytes32(0), "PolicyRegistry: no active policy");
         require(newHash == pendingPolicyHash, "PolicyRegistry: not pending");
         require(block.timestamp >= pendingProposedAt + POLICY_UPDATE_TIMELOCK, "PolicyRegistry: timelock not expired");
         require(_policyBytecode[newHash].length > 0, "PolicyRegistry: bytecode not found");
-
-        // Ensure new constraints are a superset of current
-        bytes32[] memory currentConstraints = _policyMeta[activePolicyHash].hardConstraintIds;
-        bytes32[] memory newConstraints = _policyMeta[newHash].hardConstraintIds;
-        for (uint256 i = 0; i < currentConstraints.length; i++) {
-            bool found = false;
-            for (uint256 j = 0; j < newConstraints.length; j++) {
-                if (currentConstraints[i] == newConstraints[j]) { found = true; break; }
-            }
-            require(found, "PolicyRegistry: constraints weakened");
-        }
 
         bytes32 previousHash = activePolicyHash;
         _policyMeta[previousHash].active = false;

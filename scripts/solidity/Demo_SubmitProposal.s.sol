@@ -24,6 +24,9 @@ contract DemoSubmitProposal is Script {
         console2.log("Agent:", agent);
         console2.log("Recipient:", recipient);
         console2.log("Amount: 1000 mUSDC");
+        console2.log("ProposalRegistry:", proposalRegistry);
+        console2.log("mUSDC:", musdc);
+        console2.log("Chain ID:", block.chainid);
 
         ProposalRegistry reg = ProposalRegistry(proposalRegistry);
         uint256 bond = reg.agentBonds(agent);

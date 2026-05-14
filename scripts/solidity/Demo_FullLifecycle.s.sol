@@ -64,6 +64,20 @@ contract DemoFullLifecycle is Script {
         vm.stopBroadcast();
 
         console2.log("Step 4: Wait 1 hour for timelock, then run Step 5.");
-        console2.log("=== Demo complete (Steps 1-4). Run executeProposal manually after timelock. ===");
+        console2.log("        To execute after timelock:");
+        console2.log("        vault.executeApproved(proposalId)");
+
+        // --- Step 4: Timelock wait ---
+        // In a live scenario, wait 1 hour for the timelock to expire.
+        // On a fork or local chain, use vm.warp(block.timestamp + 1 hours + 1).
+
+        // --- Step 5: Execute proposal ---
+        // After the timelock has expired, anyone can call:
+        //   vault.executeApproved(proposalId);
+        // This will re-evaluate the policy at execution time, dispatch actions,
+        // and record tax events via TaxEngine.
+
+        console2.log("Step 5: Execute proposal after timelock via vault.executeApproved(proposalId)");
+        console2.log("=== Demo complete (Steps 1-5). Run executeProposal manually after timelock. ===");
     }
 }

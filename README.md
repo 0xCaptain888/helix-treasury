@@ -186,6 +186,26 @@ Full setup: [docs/06-deployment.md](./docs/06-deployment.md)
 
 > Network: Arbitrum Sepolia (Chain ID 421614). Total on-chain transactions: **94** (14 deployment + 80 interaction suite). Deployer/Safe: `0x2F9fDE6B6FB8d7353aB80F082f85F0d70B809C3b`. Guardian: `0xC7e424c1E4B346c06A35241e7BCa469477483683`. Agent: `0x4c9Cef3bc7F5455d2581b717f115B2c76Fc1d092`.
 
+## Robinhood Chain Testnet
+
+Helix supports Robinhood Chain testnet for tokenized equity operations (BUY_RWA, SELL_RWA, REDEEM_RWA). The `RobinhoodRWAAdapter` is deployed on Arbitrum Sepolia but designed to bridge and interact with Robinhood Chain's tokenized assets.
+
+**Robinhood Chain Testnet RPC Configuration:**
+
+| Parameter | Value |
+|---|---|
+| HTTPS RPC | `https://rpc.testnet.chain.robinhood.com` |
+| WebSocket (event subscription) | `wss://feed.testnet.chain.robinhood.com` |
+
+To configure for Robinhood Chain testnet, add the following to your `.env`:
+
+```bash
+ROBINHOOD_TESTNET_RPC=https://rpc.testnet.chain.robinhood.com
+ROBINHOOD_TESTNET_WS=wss://feed.testnet.chain.robinhood.com
+```
+
+The `RobinhoodRWAAdapter` handles corporate actions (dividends, stock splits, mergers) via the `CorporateActionListener`, which monitors Robinhood Chain events and records them in the `TaxEngine` for jurisdiction-aware tax reporting.
+
 ## Repository Structure
 
 ```

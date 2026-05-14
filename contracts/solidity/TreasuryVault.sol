@@ -56,6 +56,11 @@ contract TreasuryVault is ITreasuryVault {
         _;
     }
 
+    modifier onlyProposalRegistry() {
+        require(msg.sender == proposalRegistry, "TreasuryVault: not proposal registry");
+        _;
+    }
+
     constructor(
         address _safe,
         address _guardian,
@@ -234,7 +239,7 @@ contract TreasuryVault is ITreasuryVault {
         Verdict memory verdict = _decodeVerdict(verdictBytes);
         require(
             verdict.kind == VerdictKind.Approve,
-            "TreasuryVault: stale verdict -- policy rejected at execution"
+            "TreasuryVault: stale verdict - policy rejected at execution"
         );
 
         for (uint256 i = 0; i < p.actions.length; i++) {

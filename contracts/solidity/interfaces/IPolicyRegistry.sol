@@ -16,7 +16,7 @@ interface IPolicyRegistry {
         bytes32[] hardConstraintIds;
     }
 
-    event PolicyProposed(bytes32 indexed hash, address indexed by, uint64 earliestActivation);
+    event PolicyProposed(bytes32 indexed newHash, bytes32 indexed previousHash, address author);
     event PolicyActivated(bytes32 indexed hash, bytes32 indexed previousHash);
     event PolicyRejected(bytes32 indexed hash, bytes reason);
 

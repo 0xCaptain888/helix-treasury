@@ -36,6 +36,7 @@ contract TaxEngine is ITaxEngine {
     }
 
     constructor(address _safe, address _vault, bytes8 _jurisdiction, uint8 _lotMethod) {
+        require(_lotMethod <= 2, "TaxEngine: bad lot method");
         safe = _safe;
         vault = _vault;
         jurisdiction = _jurisdiction;
@@ -61,19 +62,22 @@ contract TaxEngine is ITaxEngine {
                     id: evId,
                     proposalId: proposalId,
                     occurredAt: uint64(block.timestamp),
-                    kind: TaxEventKind.REALIZED_GAIN, // acquisition; no PnL
+                    kind: TaxEventKind.INTERNAL_TRANSFER, // acquisition — no PnL
                     asset: a.asset,
                     amount: a.amount,
                     costBasis: a.amount,
+                    proceedsUsd6: 0,
+                    realizedPnlUsd6: 0,
+                    lotMethod: lotMethod,
                     jurisdiction: jurisdiction,
                     metadata: bytes32(0)
                 }));
                 _eventsByProposal[proposalId].push(idx);
-                emit TaxEventRecorded(evId, proposalId, TaxEventKind.REALIZED_GAIN, a.asset, a.amount, 0);
+                emit TaxEventRecorded(evId, proposalId, TaxEventKind.INTERNAL_TRANSFER, a.asset, a.amount, 0);
 
             } else if (
                 k == ActionKind.WITHDRAW || k == ActionKind.SELL_RWA ||
-                k == ActionKind.SELL_PT  || k == ActionKind.SWAP
+                k == ActionKind.SELL_PT
             ) {
                 // Disposition: select lot, compute PnL
                 (uint256 costBasis, uint256 consumed) = _consumeLots(a.asset, a.amount);
@@ -90,11 +94,52 @@ contract TaxEngine is ITaxEngine {
                     asset: a.asset,
                     amount: consumed,
                     costBasis: costBasis,
+                    proceedsUsd6: a.amount,
+                    realizedPnlUsd6: pnl,
+                    lotMethod: lotMethod,
                     jurisdiction: jurisdiction,
                     metadata: bytes32(0)
                 }));
                 _eventsByProposal[proposalId].push(idx);
                 emit TaxEventRecorded(evId, proposalId, evKind, a.asset, consumed, pnl);
+
+            } else if (k == ActionKind.SWAP) {
+                // SWAP: sell side — consume lots for the sold asset
+                (uint256 costBasis, uint256 consumed) = _consumeLots(a.asset, a.amount);
+                int256 pnl = int256(a.amount) - int256(costBasis);
+                TaxEventKind evKind = pnl >= 0 ? TaxEventKind.REALIZED_GAIN : TaxEventKind.REALIZED_LOSS;
+
+                bytes32 evId = keccak256(abi.encodePacked(proposalId, a.asset, i));
+                uint256 idx = _events.length;
+                _events.push(TaxEvent({
+                    id: evId,
+                    proposalId: proposalId,
+                    occurredAt: uint64(block.timestamp),
+                    kind: evKind,
+                    asset: a.asset,
+                    amount: consumed,
+                    costBasis: costBasis,
+                    proceedsUsd6: a.amount,
+                    realizedPnlUsd6: pnl,
+                    lotMethod: lotMethod,
+                    jurisdiction: jurisdiction,
+                    metadata: bytes32(0)
+                }));
+                _eventsByProposal[proposalId].push(idx);
+                emit TaxEventRecorded(evId, proposalId, evKind, a.asset, consumed, pnl);
+
+                // SWAP: buy side — create a lot for the acquired asset
+                // The target asset and amount are encoded in params
+                if (a.params.length >= 52) {
+                    (address buyAsset, uint256 buyAmount) = abi.decode(a.params, (address, uint256));
+                    if (buyAsset != address(0) && buyAmount > 0) {
+                        _lotsByAsset[buyAsset].push(Lot({
+                            amount: buyAmount,
+                            costBasisUsd6: a.amount, // cost basis = what was sold
+                            acquiredAt: uint64(block.timestamp)
+                        }));
+                    }
+                }
 
             } else if (k == ActionKind.TRANSFER) {
                 bytes32 evId = keccak256(abi.encodePacked(proposalId, a.asset, i));
@@ -107,6 +152,9 @@ contract TaxEngine is ITaxEngine {
                     asset: a.asset,
                     amount: a.amount,
                     costBasis: 0,
+                    proceedsUsd6: 0,
+                    realizedPnlUsd6: 0,
+                    lotMethod: lotMethod,
                     jurisdiction: jurisdiction,
                     metadata: bytes32(0)
                 }));
@@ -134,8 +182,10 @@ contract TaxEngine is ITaxEngine {
             remaining -= take;
 
             if (take == lot.amount) {
-                // Remove lot by swapping with last and popping
-                lots[idx] = lots[lots.length - 1];
+                // Remove lot using shift-left to preserve ordering (required for FIFO correctness)
+                for (uint256 j = idx; j < lots.length - 1; j++) {
+                    lots[j] = lots[j + 1];
+                }
                 lots.pop();
             } else {
                 lot.costBasisUsd6 -= cost;
@@ -182,6 +232,9 @@ contract TaxEngine is ITaxEngine {
             asset: asset,
             amount: amount,
             costBasis: 0,
+            proceedsUsd6: 0,
+            realizedPnlUsd6: 0,
+            lotMethod: lotMethod,
             jurisdiction: jurisdiction,
             metadata: metadata
         }));

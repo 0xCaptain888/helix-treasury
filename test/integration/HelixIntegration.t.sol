@@ -349,6 +349,29 @@ contract HelixIntegrationTest is Test {
         }));
     }
 
+    /// @notice Invariant: vault balance should never decrease outside of approved executions.
+    /// @dev Documents the invariant that vault balances are non-decreasing absent proposals.
+    function test_invariant_VaultBalanceNonDecreasing() public {
+        // Deposit an initial amount
+        uint256 initialAmount = 500_000e18;
+        _depositUsdc(initialAmount);
+        uint256 balanceBefore = usdc.balanceOf(address(vault));
+
+        // Perform additional deposit — balance should only increase
+        uint256 additionalDeposit = 100_000e18;
+        _depositUsdc(additionalDeposit);
+        uint256 balanceAfter = usdc.balanceOf(address(vault));
+
+        assertGe(balanceAfter, balanceBefore, "invariant violated: vault balance decreased without execution");
+
+        // Verify the exact expected balance
+        assertEq(
+            balanceAfter,
+            initialAmount + additionalDeposit,
+            "invariant violated: vault balance mismatch"
+        );
+    }
+
     function _depositUsdc(uint256 amount) internal {
         usdc.mint(alice, amount);
         vm.prank(alice);

@@ -26,8 +26,8 @@ jobs:
 
       - name: Install forge-std
         run: |
-          forge install foundry-rs/forge-std --no-git
-          forge install OpenZeppelin/openzeppelin-contracts@v5.0.2 --no-git
+          forge install foundry-rs/forge-std --no-commit
+          forge install OpenZeppelin/openzeppelin-contracts@v5.0.2 --no-commit
 
       - name: Show forge version
         run: forge --version
@@ -36,6 +36,9 @@ jobs:
         run: forge build --sizes
         env:
           FOUNDRY_PROFILE: ci
+
+      - name: Check Solidity formatting
+        run: forge fmt --check
 
       - name: Run tests
         run: forge test -vvv --gas-report 2>&1 | tee test-output.txt
@@ -85,6 +88,15 @@ jobs:
       - name: Build (native)
         run: cargo build
 
+      - name: Build (WASM)
+        run: cargo build --target wasm32-unknown-unknown --release
+
+      - name: Check Rust formatting
+        run: cargo fmt --check
+
+      - name: Clippy lint
+        run: cargo clippy -- -D warnings
+
       - name: Run unit tests
         run: cargo test -- --nocapture
 
@@ -108,6 +120,9 @@ jobs:
 
       - name: Build Agent
         run: npm run build --workspace=@helix-treasury/agent
+
+      - name: Run Agent/SDK tests
+        run: npm test --workspaces --if-present
 
   status:
     name: All checks
