@@ -14,11 +14,13 @@ optimizer_runs = 200
 via_ir = true
 fs_permissions = [{ access = "read-write", path = "./" }]
 
+# Stylus contracts live in contracts/stylus and are built separately with cargo-stylus
+
 [profile.ci]
 src = "contracts/solidity"
 test = "test"
-fuzz = { runs = 256 }
-invariant = { runs = 64 }
+fuzz = { runs = 10000 }
+invariant = { runs = 1000, depth = 64 }
 verbosity = 2
 
 [fmt]

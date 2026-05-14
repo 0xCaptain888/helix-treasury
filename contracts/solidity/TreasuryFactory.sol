@@ -7,21 +7,22 @@ import {TreasuryVault} from "./TreasuryVault.sol";
 import {TaxEngine} from "./TaxEngine.sol";
 
 /// @title TreasuryFactory
-/// @notice One-shot atomic deployment of a complete Helix treasury (vault + tax engine).
-///         PolicyRegistry and ProposalRegistry are deployed separately in Phase 2.
+/// @notice One-shot atomic deployment of a complete Helix treasury (vault + registries + tax).
 /// @dev See docs/04-contracts.md §8.
 contract TreasuryFactory {
-    struct TreasuryConfig {
+    struct DeployConfig {
         address safe;
         address guardian;
-        address proposalRegistry;
-        address policyEngine;
-        address policyRegistry;
-        address oracleAggregator;
-        uint8 defaultJurisdiction; // 0=US_FIFO
+        bytes32 initialPolicyHash;
+        bytes initialPolicyBytecode;
+        bytes32[] hardConstraintIds;
+        bytes8 jurisdiction;
+        uint8 lotMethod;
+        address[] initialAssets;
+        address[] authorizedAgents;
     }
 
-    address public immutable engine;
+    address public immutable engine; // shared PolicyEngine (Stylus)
     address public immutable verifier;
     address public immutable hardConstraintsLib;
     address public immutable oracleAggregator;
@@ -29,6 +30,8 @@ contract TreasuryFactory {
     event TreasuryDeployed(
         address indexed safe,
         address indexed vault,
+        address policyRegistry,
+        address proposalRegistry,
         address taxEngine
     );
 
@@ -39,33 +42,36 @@ contract TreasuryFactory {
         oracleAggregator = _oracleAggregator;
     }
 
-    function deploy(TreasuryConfig calldata cfg)
+    function deployTreasury(DeployConfig calldata cfg)
         external
-        returns (address vault, address taxEngineAddr)
+        returns (address vault, address policyRegistryAddr, address proposalRegistryAddr, address taxEngineAddr)
     {
         require(cfg.safe != address(0) && cfg.guardian != address(0), "Factory: zero addr");
 
-        // 1. Deploy TaxEngine (with a temporary vault address of address(0),
-        //    then wire it after vault deployment via CREATE2 precomputation or setter pattern)
-        TaxEngine tax = new TaxEngine(
+        // 1. Deploy PolicyRegistry
+        policyRegistryAddr = address(new PolicyRegistry(
             cfg.safe,
-            address(0), // vault not yet known
-            bytes8(uint64(cfg.defaultJurisdiction)),
-            0 // FIFO default
-        );
-        taxEngineAddr = address(tax);
+            verifier,
+            hardConstraintsLib,
+            cfg.initialPolicyBytecode,
+            cfg.hardConstraintIds
+        ));
 
-        // 2. Deploy TreasuryVault
-        TreasuryVault v = new TreasuryVault(
-            cfg.safe,
-            cfg.guardian,
-            cfg.proposalRegistry,
-            cfg.policyEngine,
-            taxEngineAddr,
-            cfg.oracleAggregator
-        );
-        vault = address(v);
+        // 2. Deploy ProposalRegistry
+        proposalRegistryAddr = address(new ProposalRegistry(engine, policyRegistryAddr, cfg.safe, cfg.guardian));
 
-        emit TreasuryDeployed(cfg.safe, vault, taxEngineAddr);
+        // 3. Deploy TaxEngine (vault address will be set in step 5 reverse wiring)
+        // TODO(mulerun): TaxEngine needs vault address; either use CREATE2 with precomputed address
+        // or implement a setVault one-shot initializer.
+
+        // 4. Deploy TreasuryVault
+        // TODO(mulerun): vault = new TreasuryVault(cfg.safe, cfg.guardian, proposalRegistryAddr, engine, taxEngineAddr, oracleAggregator);
+
+        // 5. Wire ProposalRegistry.setVault(vault)
+        // 6. Register initial assets
+        // 7. Register initial authorized agents
+        // 8. Emit TreasuryDeployed
+
+        revert("TreasuryFactory: not implemented");
     }
 }

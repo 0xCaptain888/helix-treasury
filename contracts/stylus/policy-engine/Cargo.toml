@@ -14,6 +14,8 @@ stylus-sdk = { version = "0.6.0", default-features = false }
 alloy-primitives = { version = "0.7.6", default-features = false, features = ["rlp"] }
 alloy-sol-types = { version = "0.7.6", default-features = false }
 mini-alloc = "0.4.2"
+fixed = "1.27"
+heapless = "0.8"
 
 [dev-dependencies]
 stylus-sdk = { version = "0.6.0", features = ["debug"] }
