@@ -163,7 +163,27 @@ Full setup: [docs/06-deployment.md](./docs/06-deployment.md)
 | PendleAdapter | [`0x759aE549389eeDf1F055606fD9b72d071c7Ac3fa`](https://sepolia.arbiscan.io/address/0x759aE549389eeDf1F055606fD9b72d071c7Ac3fa) |
 | RobinhoodRWAAdapter | [`0x41d158986CDAd44c7275A681a05215c9Aa1cAe1e`](https://sepolia.arbiscan.io/address/0x41d158986CDAd44c7275A681a05215c9Aa1cAe1e) |
 
-> Network: Arbitrum Sepolia (Chain ID 421614). Deployer/Safe: `0x2F9fDE6B6FB8d7353aB80F082f85F0d70B809C3b`. Guardian: `0xC7e424c1E4B346c06A35241e7BCa469477483683`. Agent: `0x4c9Cef3bc7F5455d2581b717f115B2c76Fc1d092`.
+**Mock Tokens (for testnet interaction)**
+
+| Token | Address |
+|---|---|
+| mUSDC (6 dec) | [`0x9582d2dF303ec2B1fab104A77E249C05571fccC9`](https://sepolia.arbiscan.io/address/0x9582d2dF303ec2B1fab104A77E249C05571fccC9) |
+| mWETH (18 dec) | [`0x185346Bd15223740dA8D6D7A11F18b1c93971525`](https://sepolia.arbiscan.io/address/0x185346Bd15223740dA8D6D7A11F18b1c93971525) |
+| mARB (18 dec) | [`0xfcc6bE4Dfc45322b8C99fFFB255C1DEcd8f07907`](https://sepolia.arbiscan.io/address/0xfcc6bE4Dfc45322b8C99fFFB255C1DEcd8f07907) |
+| mSPY - tokenized equity (18 dec) | [`0x2fc6e0987bF58F5A0Dc76801A9556Ab62bD42049`](https://sepolia.arbiscan.io/address/0x2fc6e0987bF58F5A0Dc76801A9556Ab62bD42049) |
+| mTBILL - tokenized T-Bill (18 dec) | [`0x2A7D252D0bFF31eC1098FF642C0934b7124a5A33`](https://sepolia.arbiscan.io/address/0x2A7D252D0bFF31eC1098FF642C0934b7124a5A33) |
+
+**Current Vault Holdings**
+
+| Asset | Balance |
+|---|---|
+| mUSDC | 340,000 |
+| mWETH | 55 |
+| mARB | 150,000 |
+| mSPY | 700 |
+| mTBILL | 150,000 |
+
+> Network: Arbitrum Sepolia (Chain ID 421614). Total on-chain transactions: **94** (14 deployment + 80 interaction suite). Deployer/Safe: `0x2F9fDE6B6FB8d7353aB80F082f85F0d70B809C3b`. Guardian: `0xC7e424c1E4B346c06A35241e7BCa469477483683`. Agent: `0x4c9Cef3bc7F5455d2581b717f115B2c76Fc1d092`.
 
 ## Repository Structure
 
@@ -237,6 +257,8 @@ helix/
 | `06_FundTreasury.s.sol` — treasury funding + agent bond script | ✅ Complete | Week 2 |
 | Deployment to Arbitrum Sepolia (9 contracts, 14 txns) | ✅ Complete | Week 2 |
 | On-chain verification (pause/unpause, bond, breaker, timelock) | ✅ Complete | Week 2 |
+| On-chain interaction suite (80 txns: deposits, withdrawals, drills, config) | ✅ Complete | Week 2 |
+| Mock token deployment (mUSDC, mWETH, mARB, mSPY, mTBILL) | ✅ Complete | Week 2 |
 | PolicyEngine full implementation (Rust) | 🚧 In progress | Week 3 |
 | Multi-treasury federation | ⬜ Planned | Week 3 |
 | Integration tests + fuzzing invariants | ⬜ Planned | Week 3 |
