@@ -149,6 +149,22 @@ pnpm deploy:sepolia
 
 Full setup: [docs/06-deployment.md](./docs/06-deployment.md)
 
+## Deployed Contracts (Arbitrum Sepolia)
+
+| Contract | Address |
+|---|---|
+| OracleAggregator | [`0x6F4DF8979a8f18Ce3fD2ff941e5a3610E5cAfCa5`](https://sepolia.arbiscan.io/address/0x6F4DF8979a8f18Ce3fD2ff941e5a3610E5cAfCa5) |
+| PolicyRegistry | [`0x7058132Ba4aE19983c61590644F2943A3B7fDf80`](https://sepolia.arbiscan.io/address/0x7058132Ba4aE19983c61590644F2943A3B7fDf80) |
+| ProposalRegistry | [`0x494960e21058290BB2F1328b6b837dCF26aA5DCb`](https://sepolia.arbiscan.io/address/0x494960e21058290BB2F1328b6b837dCF26aA5DCb) |
+| TreasuryVault | [`0x2A46cF6493b377D45908254B0528e38990AA323f`](https://sepolia.arbiscan.io/address/0x2A46cF6493b377D45908254B0528e38990AA323f) |
+| TaxEngine | [`0x8a8C3532359aAACb6C3a1060deF4938F6006c8F1`](https://sepolia.arbiscan.io/address/0x8a8C3532359aAACb6C3a1060deF4938F6006c8F1) |
+| ERC20Adapter | [`0x77472dADA40B8c30304a7FbbAf14e1b200A5c7FE`](https://sepolia.arbiscan.io/address/0x77472dADA40B8c30304a7FbbAf14e1b200A5c7FE) |
+| AaveAdapter | [`0x1D77BBE8E921604c47CAb229Fc0727C5967F19a8`](https://sepolia.arbiscan.io/address/0x1D77BBE8E921604c47CAb229Fc0727C5967F19a8) |
+| PendleAdapter | [`0x759aE549389eeDf1F055606fD9b72d071c7Ac3fa`](https://sepolia.arbiscan.io/address/0x759aE549389eeDf1F055606fD9b72d071c7Ac3fa) |
+| RobinhoodRWAAdapter | [`0x41d158986CDAd44c7275A681a05215c9Aa1cAe1e`](https://sepolia.arbiscan.io/address/0x41d158986CDAd44c7275A681a05215c9Aa1cAe1e) |
+
+> Network: Arbitrum Sepolia (Chain ID 421614). Deployer/Safe: `0x2F9fDE6B6FB8d7353aB80F082f85F0d70B809C3b`. Guardian: `0xC7e424c1E4B346c06A35241e7BCa469477483683`. Agent: `0x4c9Cef3bc7F5455d2581b717f115B2c76Fc1d092`.
+
 ## Repository Structure
 
 ```
@@ -219,10 +235,11 @@ helix/
 | Test files — constructor signatures fixed, all tests compile | ✅ Complete | Week 2 |
 | `05_DeployCrossChain.s.sol` — adapter deployment script | ✅ Complete | Week 2 |
 | `06_FundTreasury.s.sol` — treasury funding + agent bond script | ✅ Complete | Week 2 |
+| Deployment to Arbitrum Sepolia (9 contracts, 14 txns) | ✅ Complete | Week 2 |
+| On-chain verification (pause/unpause, bond, breaker, timelock) | ✅ Complete | Week 2 |
 | PolicyEngine full implementation (Rust) | 🚧 In progress | Week 3 |
 | Multi-treasury federation | ⬜ Planned | Week 3 |
 | Integration tests + fuzzing invariants | ⬜ Planned | Week 3 |
-| Deployment to Sepolia + Robinhood testnet | ⬜ Planned | Week 3 |
 | Submission | ⬜ | **2026-06-14** |
 
 Mainnet deployment is **explicitly gated** on third-party audit (Trail of Bits / OpenZeppelin) and Immunefi bug bounty launch. Target mainnet: Q3 2026. See [docs/05-security-model.md](./docs/05-security-model.md) for our security posture.

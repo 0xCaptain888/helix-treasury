@@ -22,7 +22,7 @@ contract BootstrapTreasury is Script {
     // Arbitrum Sepolia token addresses
     address constant USDC_SEPOLIA   = 0x75faf114eafb1BDbe2F0316DF893fd58CE46AA4d;
     address constant WETH_SEPOLIA   = 0x980B62Da83eFf3D4576C647993b0c1D7faf17c73;
-    address constant ARB_SEPOLIA    = 0x9d04741a45E3ac6AB8E91e69E1aFb34dAB4aFBe3;
+    address constant ARB_SEPOLIA    = 0x9d04741a45e3AC6AB8e91e69E1AFb34DaB4AFbe3;
     // Robinhood Chain testnet — placeholder; update when testnet is live
     address constant RH_TBILL_SEPOLIA = address(0);
 
