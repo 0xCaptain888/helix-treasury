@@ -2,139 +2,377 @@
 pragma solidity ^0.8.26;
 
 import {Test, console2} from "forge-std/Test.sol";
-import {TreasuryFactory} from "../../contracts/solidity/TreasuryFactory.sol";
 import {TreasuryVault} from "../../contracts/solidity/TreasuryVault.sol";
 import {PolicyRegistry} from "../../contracts/solidity/PolicyRegistry.sol";
 import {ProposalRegistry} from "../../contracts/solidity/ProposalRegistry.sol";
 import {TaxEngine} from "../../contracts/solidity/TaxEngine.sol";
 import {OracleAggregator} from "../../contracts/solidity/OracleAggregator.sol";
 import {ITreasuryVault} from "../../contracts/solidity/interfaces/ITreasuryVault.sol";
-import {Action, ActionKind, ProposalState} from "../../contracts/solidity/HelixTypes.sol";
+import {IProposalRegistry} from "../../contracts/solidity/interfaces/IProposalRegistry.sol";
+import {Action, ActionKind, ProposalState, Verdict, VerdictKind} from "../../contracts/solidity/HelixTypes.sol";
 
-/// @notice End-to-end integration test for the Helix proposal lifecycle.
-///         Run against a forked Arbitrum Sepolia for realistic oracle / protocol conditions.
-///
-/// Usage:
-///   forge test --match-contract HelixIntegrationTest -vvvv \
-///     --fork-url $ARBITRUM_SEPOLIA_RPC
+contract MockPolicyEngine {
+    function evaluate(
+        bytes32 policyHash,
+        bytes calldata, bytes calldata, bytes calldata
+    ) external pure returns (bytes memory) {
+        return abi.encodePacked(
+            uint256(0),
+            policyHash,
+            bytes32(0),
+            bytes32(0),
+            uint256(0),
+            uint256(0)
+        );
+    }
+}
+
+contract MockERC20 {
+    string public name;
+    string public symbol;
+    uint8 public decimals = 18;
+    mapping(address => uint256) public balanceOf;
+    mapping(address => mapping(address => uint256)) public allowance;
+
+    constructor(string memory _name, string memory _symbol) {
+        name = _name; symbol = _symbol;
+    }
+
+    function mint(address to, uint256 amount) external {
+        balanceOf[to] += amount;
+    }
+
+    function transfer(address to, uint256 amount) external returns (bool) {
+        balanceOf[msg.sender] -= amount;
+        balanceOf[to] += amount;
+        return true;
+    }
+
+    function transferFrom(address from, address to, uint256 amount) external returns (bool) {
+        allowance[from][msg.sender] -= amount;
+        balanceOf[from] -= amount;
+        balanceOf[to] += amount;
+        return true;
+    }
+
+    function approve(address spender, uint256 amount) external returns (bool) {
+        allowance[msg.sender][spender] = amount;
+        return true;
+    }
+}
+
 contract HelixIntegrationTest is Test {
-    // ─── Actors ───
-    address safe = makeAddr("safe");
+    address safe     = makeAddr("safe");
     address guardian = makeAddr("guardian");
-    address agent = makeAddr("agent");
-    address alice = makeAddr("alice");  // treasury depositor
+    address agent    = makeAddr("agent");
+    address alice    = makeAddr("alice");
 
-    // ─── Contracts ───
-    TreasuryVault vault;
-    PolicyRegistry policyRegistry;
+    TreasuryVault    vault;
+    PolicyRegistry   policyRegistry;
     ProposalRegistry proposalRegistry;
-    TaxEngine taxEngine;
-    OracleAggregator oracle;
-
-    // ─── Mock addresses (replaced with real on fork) ───
-    address mockPolicyEngine;
-    address mockChainlink = makeAddr("chainlink");
-    address mockPyth = makeAddr("pyth");
-    address mockUsdc = makeAddr("usdc");
+    TaxEngine        taxEngine;
+    MockPolicyEngine mockEngine;
+    MockERC20        usdc;
 
     function setUp() public {
-        // Deploy mock PolicyEngine (in integration: use real Stylus contract on fork)
-        // TODO(mulerun): deploy MockPolicyEngine that always returns Approve
-        mockPolicyEngine = makeAddr("policyEngine");
+        usdc = new MockERC20("Mock USDC", "mUSDC");
+        mockEngine = new MockPolicyEngine();
 
-        // 1. OracleAggregator
-        oracle = new OracleAggregator(mockChainlink, mockPyth, safe, guardian);
-
-        // 2. PolicyRegistry with a trivial "approve everything" policy
-        bytes memory trivialPolicy = abi.encode("trivial-policy-v1");
+        bytes memory initialPolicy = abi.encodePacked(
+            hex"48454c58", uint32(1),
+            address(safe)
+        );
         bytes32[] memory noConstraints = new bytes32[](0);
         policyRegistry = new PolicyRegistry(
-            safe, mockPolicyEngine, mockPolicyEngine, trivialPolicy, noConstraints
+            safe,
+            address(mockEngine),
+            address(mockEngine),
+            initialPolicy,
+            noConstraints
         );
 
-        // 3. ProposalRegistry
         proposalRegistry = new ProposalRegistry(
-            mockPolicyEngine,
+            address(mockEngine),
             address(policyRegistry),
             safe,
             guardian
         );
 
-        // 4. TreasuryVault
         vault = new TreasuryVault(
-            safe, guardian,
+            safe,
+            guardian,
             address(proposalRegistry),
-            mockPolicyEngine,
-            address(0),  // taxEngine wired after
-            address(oracle)
+            address(mockEngine),
+            address(0),
+            address(0)
         );
 
-        // 5. TaxEngine
-        taxEngine = new TaxEngine(safe, address(vault), bytes8(0) /* US jurisdiction */, 0 /* FIFO */);
+        taxEngine = new TaxEngine(safe, address(vault), bytes8("US-FIFO"), 0);
 
-        // 6. Wire vault and agent into ProposalRegistry
-        vm.startPrank(safe);
+        vm.prank(safe);
         proposalRegistry.setVault(address(vault));
-        proposalRegistry.setAuthorizedAgent(agent, true);
-        vm.stopPrank();
 
-        // 7. Register USDC as asset
         vm.prank(safe);
         vault.registerAsset(ITreasuryVault.AssetEntry({
-            token: mockUsdc,
-            decimals: 6,
-            isStable: true,
-            isLiquid: true,
-            protocol: ITreasuryVault.Protocol.WALLET,
+            token: address(usdc),
+            tokenType: 0,
+            adapter: bytes32(0),
+            active: true,
+            registeredAt: uint64(block.timestamp)
+        }));
+
+        vm.prank(safe);
+        proposalRegistry.setAuthorizedAgent(agent, true);
+
+        vm.deal(agent, 1 ether);
+        vm.prank(agent);
+        proposalRegistry.postBond{value: 0.1 ether}();
+    }
+
+    function test_Deposit_USDC() public {
+        usdc.mint(alice, 1_000_000e18);
+        vm.prank(alice);
+        usdc.approve(address(vault), 1_000_000e18);
+        vm.prank(alice);
+        vault.deposit(address(usdc), 1_000_000e18);
+
+        assertEq(usdc.balanceOf(address(vault)), 1_000_000e18);
+    }
+
+    function test_Deposit_UnregisteredAsset_Reverts() public {
+        MockERC20 rando = new MockERC20("Rando", "RND");
+        rando.mint(alice, 1000e18);
+        vm.prank(alice);
+        rando.approve(address(vault), 1000e18);
+        vm.expectRevert("TreasuryVault: asset not registered");
+        vm.prank(alice);
+        vault.deposit(address(rando), 1000e18);
+    }
+
+    function test_Deposit_Zero_Reverts() public {
+        vm.expectRevert("TreasuryVault: zero amount");
+        vm.prank(alice);
+        vault.deposit(address(usdc), 0);
+    }
+
+    function test_SubmitProposal_Unauthorized_Reverts() public {
+        Action[] memory actions = new Action[](1);
+        actions[0] = Action({
+            kind: ActionKind.TRANSFER,
             adapter: address(0),
-            active: true
+            asset: address(usdc),
+            amount: 100e18,
+            params: abi.encode(alice)
+        });
+        bytes32 ph = policyRegistry.activePolicyHash();
+        vm.expectRevert("ProposalRegistry: agent not authorized");
+        vm.prank(alice);
+        proposalRegistry.submitProposal(ph, bytes32(0), actions, bytes32(0), bytes(""));
+    }
+
+    function test_SubmitProposal_NoBond_Reverts() public {
+        address newAgent = makeAddr("newAgent");
+        vm.prank(safe);
+        proposalRegistry.setAuthorizedAgent(newAgent, true);
+
+        Action[] memory actions = _makeTransferAction(100e18);
+        bytes32 ph = policyRegistry.activePolicyHash();
+        vm.expectRevert("ProposalRegistry: insufficient bond");
+        vm.prank(newAgent);
+        proposalRegistry.submitProposal(ph, bytes32(0), actions, bytes32(0), bytes(""));
+    }
+
+    function test_SubmitProposal_Approved_Engine() public {
+        _depositUsdc(1_000_000e18);
+        Action[] memory actions = _makeTransferAction(100e18);
+
+        bytes32 ph = policyRegistry.activePolicyHash();
+        vm.prank(agent);
+        bytes32 proposalId = proposalRegistry.submitProposal(
+            ph, bytes32(0), actions, bytes32(0), bytes("")
+        );
+
+        IProposalRegistry.Proposal memory p = proposalRegistry.getProposal(proposalId);
+        assertEq(uint8(p.state), uint8(ProposalState.Pending));
+        assertEq(p.agent, agent);
+    }
+
+    function test_ApproveProposal_OnlySafe() public {
+        _depositUsdc(1_000_000e18);
+        bytes32 pid = _submitTransfer(100e18);
+
+        vm.expectRevert("ProposalRegistry: not safe");
+        vm.prank(alice);
+        proposalRegistry.approveProposal(pid);
+    }
+
+    function test_ApproveProposal_SetsState() public {
+        _depositUsdc(1_000_000e18);
+        bytes32 pid = _submitTransfer(100e18);
+
+        vm.prank(safe);
+        proposalRegistry.approveProposal(pid);
+
+        IProposalRegistry.Proposal memory p = proposalRegistry.getProposal(pid);
+        assertEq(uint8(p.state), uint8(ProposalState.Approved));
+        assertGt(p.earliestExecution, block.timestamp);
+    }
+
+    function test_ExecuteBeforeTimelock_Reverts() public {
+        _depositUsdc(1_000_000e18);
+        bytes32 pid = _submitTransfer(100e18);
+
+        vm.prank(safe);
+        proposalRegistry.approveProposal(pid);
+
+        vm.expectRevert("TreasuryVault: timelock active");
+        vault.executeApproved(pid);
+    }
+
+    function test_FullLifecycle_HappyPath() public {
+        _depositUsdc(1_000_000e18);
+        assertEq(usdc.balanceOf(address(vault)), 1_000_000e18);
+
+        bytes32 pid = _submitTransfer(100e18);
+
+        vm.prank(safe);
+        proposalRegistry.approveProposal(pid);
+
+        vm.warp(block.timestamp + 1 hours + 1);
+
+        uint256 aliceBefore = usdc.balanceOf(alice);
+        vault.executeApproved(pid);
+
+        IProposalRegistry.Proposal memory p = proposalRegistry.getProposal(pid);
+        assertEq(uint8(p.state), uint8(ProposalState.Executed));
+        assertEq(usdc.balanceOf(alice), aliceBefore + 100e18, "alice should receive USDC");
+        assertEq(usdc.balanceOf(address(vault)), 1_000_000e18 - 100e18, "vault balance reduced");
+        assertTrue(vault.executedProposals(pid), "should be idempotency-locked");
+    }
+
+    function test_DoubleExecution_Reverts() public {
+        _depositUsdc(1_000_000e18);
+        bytes32 pid = _submitTransfer(100e18);
+
+        vm.prank(safe);
+        proposalRegistry.approveProposal(pid);
+        vm.warp(block.timestamp + 1 hours + 1);
+        vault.executeApproved(pid);
+
+        vm.expectRevert("TreasuryVault: already executed");
+        vault.executeApproved(pid);
+    }
+
+    function test_EmergencyPause_BlocksDeposit() public {
+        vm.prank(guardian);
+        vault.emergencyPause();
+        assertTrue(vault.paused());
+
+        usdc.mint(alice, 1000e18);
+        vm.prank(alice);
+        usdc.approve(address(vault), 1000e18);
+        vm.expectRevert("TreasuryVault: paused");
+        vm.prank(alice);
+        vault.deposit(address(usdc), 1000e18);
+    }
+
+    function test_EmergencyUnpause_OnlySafe() public {
+        vm.prank(guardian);
+        vault.emergencyPause();
+        vm.expectRevert("TreasuryVault: not safe");
+        vm.prank(guardian);
+        vault.emergencyUnpause();
+        vm.prank(safe);
+        vault.emergencyUnpause();
+        assertFalse(vault.paused());
+    }
+
+    function test_CancelProposal_DuringTimelock() public {
+        _depositUsdc(1_000_000e18);
+        bytes32 pid = _submitTransfer(100e18);
+
+        vm.prank(safe);
+        proposalRegistry.approveProposal(pid);
+
+        vm.prank(guardian);
+        proposalRegistry.cancelProposal(pid, "Security review failed");
+
+        IProposalRegistry.Proposal memory p = proposalRegistry.getProposal(pid);
+        assertEq(uint8(p.state), uint8(ProposalState.Cancelled));
+    }
+
+    function test_CancelProposal_AfterTimelockExpired_Reverts() public {
+        _depositUsdc(1_000_000e18);
+        bytes32 pid = _submitTransfer(100e18);
+
+        vm.prank(safe);
+        proposalRegistry.approveProposal(pid);
+        vm.warp(block.timestamp + 1 hours + 1);
+
+        vm.expectRevert("ProposalRegistry: timelock already expired");
+        vm.prank(guardian);
+        proposalRegistry.cancelProposal(pid, "Too late");
+    }
+
+    function test_PolicyUpdate_7DayTimelock() public {
+        bytes memory newPolicy = abi.encodePacked(hex"48454c58", uint32(2), alice);
+
+        vm.prank(safe);
+        bytes32 newHash = policyRegistry.proposeUpdate(newPolicy);
+
+        vm.expectRevert("PolicyRegistry: timelock not expired");
+        vm.prank(safe);
+        policyRegistry.activateUpdate(newHash);
+
+        vm.warp(block.timestamp + 7 days + 1);
+        vm.prank(safe);
+        policyRegistry.activateUpdate(newHash);
+        assertEq(policyRegistry.activePolicyHash(), newHash);
+    }
+
+    function test_GetState_ReturnsRegisteredAssets() public {
+        (ITreasuryVault.AssetEntry[] memory entries, uint256[] memory bals) = vault.getState();
+        assertEq(entries.length, 1);
+        assertEq(entries[0].token, address(usdc));
+        assertEq(bals[0], 0);
+    }
+
+    function test_RegisterAsset_DuplicateReverts() public {
+        vm.expectRevert("TreasuryVault: already registered");
+        vm.prank(safe);
+        vault.registerAsset(ITreasuryVault.AssetEntry({
+            token: address(usdc),
+            tokenType: 0,
+            adapter: bytes32(0),
+            active: true,
+            registeredAt: 0
         }));
     }
 
-    // ──────────── Test: full proposal lifecycle ────────────
-
-    /// @notice Happy path: agent submits → Safe approves → timelock elapses → executed.
-    function test_ProposalLifecycle_HappyPath() public {
-        // TODO(mulerun): implement once PolicyEngine and TreasuryVault.executeApproved are complete.
-        // Steps:
-        // 1. alice deposits 1000 USDC into vault
-        // 2. agent submits proposal: AAVE_SUPPLY 200 USDC
-        // 3. assert proposalId emitted, state == PolicyAccepted
-        // 4. vm.prank(safe); proposalRegistry.approveProposal(proposalId)
-        // 5. vm.warp(block.timestamp + 1 hours + 1)
-        // 6. proposalRegistry.executeProposal(proposalId)
-        // 7. assert vault USDC balance decreased by 200
-        // 8. assert TaxEngine recorded a SUPPLY event
-        assertTrue(true, "placeholder");
+    function _depositUsdc(uint256 amount) internal {
+        usdc.mint(alice, amount);
+        vm.prank(alice);
+        usdc.approve(address(vault), amount);
+        vm.prank(alice);
+        vault.deposit(address(usdc), amount);
     }
 
-    /// @notice Hard reject: agent proposes action that breaches MAX_DAILY_MOVEMENT.
-    function test_ProposalRejected_HardConstraintBreach() public {
-        // TODO(mulerun): mock PolicyEngine to return HardReject for this specific action.
-        // assert submitProposal reverts with "ProposalRegistry: hard reject"
-        assertTrue(true, "placeholder");
+    function _makeTransferAction(uint256 amount) internal view returns (Action[] memory) {
+        Action[] memory actions = new Action[](1);
+        actions[0] = Action({
+            kind: ActionKind.TRANSFER,
+            adapter: address(0),
+            asset: address(usdc),
+            amount: amount,
+            params: abi.encode(alice)
+        });
+        return actions;
     }
 
-    /// @notice Emergency pause: guardian pauses vault; agent submission fails.
-    function test_EmergencyPause() public {
-        vm.prank(guardian);
-        vault.emergencyPause();
-        assertTrue(vault.paused(), "vault should be paused");
-
-        // Agent cannot submit proposals while paused
-        // TODO(mulerun): assert proposalRegistry.submitProposal reverts
-    }
-
-    /// @notice Timelock: execution before timelock expires reverts.
-    function test_TimelockNotExpired_Reverts() public {
-        // TODO(mulerun): submit + approve proposal, then immediately try to execute without warping.
-        // assert executeProposal reverts with "ProposalRegistry: timelock active"
-        assertTrue(true, "placeholder");
-    }
-
-    /// @notice Invariant: vault balance never decreases without an executed proposal.
-    function invariant_VaultBalanceOnlyDecreasesOnExecution() public view {
-        // Foundry invariant testing — called repeatedly by fuzzer
-        // TODO(mulerun): track vault balance deltas, assert no unauthorized decrease
+    function _submitTransfer(uint256 amount) internal returns (bytes32) {
+        Action[] memory actions = _makeTransferAction(amount);
+        bytes32 ph = policyRegistry.activePolicyHash();
+        vm.prank(agent);
+        return proposalRegistry.submitProposal(ph, bytes32(0), actions, bytes32(0), bytes(""));
     }
 }

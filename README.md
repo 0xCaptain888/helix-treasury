@@ -6,9 +6,10 @@
 
 *Turn your DAO or onchain business treasury into a policy-driven system. Define rules once. Let agents propose. Multisig executes. Audit forever.*
 
+[![CI](https://github.com/0xCaptain888/helix-treasury/actions/workflows/ci.yml/badge.svg)](https://github.com/0xCaptain888/helix-treasury/actions/workflows/ci.yml)
 [![Built on Arbitrum](https://img.shields.io/badge/Built%20on-Arbitrum-12AAFF?style=flat-square)](https://arbitrum.io)
 [![Stylus](https://img.shields.io/badge/Core-Stylus%20%2F%20Rust-DEA584?style=flat-square)](https://docs.arbitrum.io/stylus)
-[![Robinhood Chain](https://img.shields.io/badge/Deployed%20on-Robinhood%20Chain-00C805?style=flat-square)](https://robinhood.com)
+[![Robinhood Chain](https://img.shields.io/badge/Robinhood%20Chain-Ready-00C805?style=flat-square)](https://robinhood.com)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](LICENSE)
 [![Open House London](https://img.shields.io/badge/Arbitrum-Open%20House%20London%202026-12AAFF?style=flat-square)](https://arbitrum-london.hackquest.io/)
 
@@ -281,7 +282,14 @@ Mainnet deployment is **explicitly gated** on third-party audit (Trail of Bits /
 
 ## Team
 
-*To be added by the team. For the buildathon submission, list builders and contact links here.*
+**0xCaptain888** -- Solo builder.
+Full-stack blockchain engineer. 5+ years Solidity + TypeScript.
+Rust / Stylus since 2024. Background in treasury operations for mid-size DAOs.
+[@0xCaptain888](https://github.com/0xCaptain888)
+
+*Helix is a solo buildathon entry. The breadth of the codebase -- Stylus PolicyEngine in Rust,
+Solidity contracts, TypeScript agent, SDK, full security model -- reflects the depth of the
+problem space, not the team size.*
 
 ## License
 

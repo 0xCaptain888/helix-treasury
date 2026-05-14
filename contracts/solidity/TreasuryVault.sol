@@ -8,14 +8,12 @@ import {IAdapter} from "./interfaces/IAdapter.sol";
 import {ITaxEngine} from "./interfaces/ITaxEngine.sol";
 import {IOracleAggregator} from "./interfaces/IOracleAggregator.sol";
 import {Action, TreasuryState, MarketState, Verdict, VerdictKind, ActionKind, ProposalState} from "./HelixTypes.sol";
+import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import {SafeERC20} from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
-/// @title TreasuryVault
-/// @notice Single custody point for treasury assets. Dispatches adapter calls only after a
-///         proposal has cleared PolicyEngine + Safe approval + timelock + execution-time
-///         re-evaluation. NON-upgradable.
-/// @dev See docs/04-contracts.md §4 and docs/05-security-model.md §3.
 contract TreasuryVault is ITreasuryVault {
-    // ──────────── Storage ────────────
+    using SafeERC20 for IERC20;
+
     mapping(address => AssetEntry) public assetsMap;
     address[] public assetList;
 
@@ -28,13 +26,14 @@ contract TreasuryVault is ITreasuryVault {
 
     bool public override paused;
     uint256 public lastActionAt;
-    uint256 public totalMovement24h; // sliding window in USDC-6
-    mapping(uint256 => uint256) private movementByHour; // ring buffer (hour → moved)
 
-    mapping(bytes32 => bool) public executedProposals; // idempotency
+    mapping(uint256 => uint256) private _movementByHour;
+    uint256 private _lastMovementHour;
 
-    // Re-entrancy guard
+    mapping(bytes32 => bool) public executedProposals;
+
     uint256 private _locked = 1;
+
     modifier nonReentrant() {
         require(_locked == 1, "TreasuryVault: reentrancy");
         _locked = 2;
@@ -48,7 +47,7 @@ contract TreasuryVault is ITreasuryVault {
     }
 
     modifier onlyGuardian() {
-        require(msg.sender == guardian, "TreasuryVault: not guardian");
+        require(msg.sender == guardian || msg.sender == safe, "TreasuryVault: not guardian");
         _;
     }
 
@@ -57,7 +56,6 @@ contract TreasuryVault is ITreasuryVault {
         _;
     }
 
-    // ──────────── Constructor ────────────
     constructor(
         address _safe,
         address _guardian,
@@ -66,7 +64,8 @@ contract TreasuryVault is ITreasuryVault {
         address _taxEngine,
         address _oracleAggregator
     ) {
-        require(_safe != address(0) && _engine != address(0), "TreasuryVault: zero addr");
+        require(_safe != address(0), "TreasuryVault: zero safe");
+        require(_engine != address(0), "TreasuryVault: zero engine");
         safe = _safe;
         guardian = _guardian;
         proposalRegistry = _proposalRegistry;
@@ -75,187 +74,209 @@ contract TreasuryVault is ITreasuryVault {
         oracleAggregator = _oracleAggregator;
     }
 
-    // ──────────── Asset registration ────────────
     function registerAsset(AssetEntry calldata entry) external override onlySafe {
         require(entry.token != address(0), "TreasuryVault: zero token");
         require(!assetsMap[entry.token].active, "TreasuryVault: already registered");
-
-        assetsMap[entry.token] = entry;
+        assetsMap[entry.token] = AssetEntry({
+            token: entry.token,
+            tokenType: entry.tokenType,
+            adapter: entry.adapter,
+            active: true,
+            registeredAt: uint64(block.timestamp)
+        });
         assetList.push(entry.token);
-        emit AssetRegistered(entry.token, bytes32(bytes20(entry.adapter)));
+        emit AssetRegistered(entry.token);
     }
 
     function deregisterAsset(address token) external override onlySafe {
         require(assetsMap[token].active, "TreasuryVault: not registered");
+        require(
+            IERC20(token).balanceOf(address(this)) == 0,
+            "TreasuryVault: non-zero balance"
+        );
         assetsMap[token].active = false;
+        for (uint256 i = 0; i < assetList.length; i++) {
+            if (assetList[i] == token) {
+                assetList[i] = assetList[assetList.length - 1];
+                assetList.pop();
+                break;
+            }
+        }
         emit AssetDeregistered(token);
     }
 
-    // ──────────── State views ────────────
-    function getState() external view override returns (AssetEntry[] memory entries, uint256[] memory balances) {
-        uint256 len = assetList.length;
-        entries = new AssetEntry[](len);
-        balances = new uint256[](len);
-        for (uint256 i = 0; i < len; i++) {
+    function getState()
+        external
+        view
+        override
+        returns (AssetEntry[] memory entries, uint256[] memory balances)
+    {
+        uint256 n = assetList.length;
+        entries = new AssetEntry[](n);
+        balances = new uint256[](n);
+        for (uint256 i = 0; i < n; i++) {
             address token = assetList[i];
             entries[i] = assetsMap[token];
-            // Read ERC20 balance
-            (, bytes memory data) = token.staticcall(
-                abi.encodeWithSignature("balanceOf(address)", address(this))
-            );
-            if (data.length >= 32) {
-                balances[i] = abi.decode(data, (uint256));
-            }
+            balances[i] = IERC20(token).balanceOf(address(this));
         }
     }
 
     function getNAV() external view override returns (uint256 totalNAVUsdc) {
-        IOracleAggregator oracle = IOracleAggregator(oracleAggregator);
-        for (uint256 i = 0; i < assetList.length; i++) {
+        if (oracleAggregator == address(0)) return 0;
+        uint256 n = assetList.length;
+        for (uint256 i = 0; i < n; i++) {
             address token = assetList[i];
             if (!assetsMap[token].active) continue;
-
-            // Read balance
-            (, bytes memory data) = token.staticcall(
-                abi.encodeWithSignature("balanceOf(address)", address(this))
-            );
-            if (data.length < 32) continue;
-            uint256 balance = abi.decode(data, (uint256));
+            uint256 balance = IERC20(token).balanceOf(address(this));
             if (balance == 0) continue;
-
-            // Get price from oracle
-            IOracleAggregator.PriceQuote memory quote = oracle.priceOf(token);
-            // Normalize: balance * priceUsd6 / 10^decimals
-            uint8 decimals = assetsMap[token].decimals;
-            totalNAVUsdc += (balance * quote.priceUsd6) / (10 ** decimals);
+            try IOracleAggregator(oracleAggregator).getPrice(token) returns (
+                uint256 priceUsdc6,
+                uint256
+            ) {
+                totalNAVUsdc += (balance * priceUsdc6) / 1e12;
+            } catch {}
         }
     }
 
-    // ──────────── Deposits ────────────
+    function _buildTreasuryState() internal view returns (TreasuryState memory state) {
+        uint256 n = assetList.length;
+        address[] memory assets = new address[](n);
+        uint256[] memory balances = new uint256[](n);
+        uint256[] memory prices = new uint256[](n);
+        uint256 nav = 0;
+        for (uint256 i = 0; i < n; i++) {
+            address token = assetList[i];
+            assets[i] = token;
+            balances[i] = IERC20(token).balanceOf(address(this));
+            if (oracleAggregator != address(0)) {
+                try IOracleAggregator(oracleAggregator).getPrice(token) returns (
+                    uint256 p, uint256
+                ) {
+                    prices[i] = p;
+                    nav += (balances[i] * p) / 1e12;
+                } catch {}
+            }
+        }
+        bytes32 stateHash = keccak256(abi.encode(assets, balances, block.timestamp));
+        state = TreasuryState({
+            assets: assets,
+            balances: balances,
+            totalNAVUsdc: nav,
+            snapshotAt: uint64(block.timestamp),
+            stateHash: stateHash
+        });
+    }
+
     function deposit(address token, uint256 amount) external override whenNotPaused {
         require(assetsMap[token].active, "TreasuryVault: asset not registered");
         require(amount > 0, "TreasuryVault: zero amount");
-
-        // Pull tokens via transferFrom
-        (bool success, bytes memory data) = token.call(
-            abi.encodeWithSignature("transferFrom(address,address,uint256)", msg.sender, address(this), amount)
-        );
-        require(success && (data.length == 0 || abi.decode(data, (bool))), "TreasuryVault: transfer failed");
-
+        IERC20(token).safeTransferFrom(msg.sender, address(this), amount);
         emit Deposited(msg.sender, token, amount);
     }
 
-    function withdraw(address token, uint256 amount, address to) external override onlySafe {
+    function withdraw(address token, uint256 amount, address to)
+        external
+        override
+        onlySafe
+        nonReentrant
+    {
         require(to != address(0), "TreasuryVault: zero recipient");
-
-        (bool success, bytes memory data) = token.call(
-            abi.encodeWithSignature("transfer(address,uint256)", to, amount)
-        );
-        require(success && (data.length == 0 || abi.decode(data, (bool))), "TreasuryVault: transfer failed");
+        require(amount > 0, "TreasuryVault: zero amount");
+        IERC20(token).safeTransfer(to, amount);
+        emit Withdrawn(token, amount, to);
     }
 
-    // ──────────── Execution ────────────
-    /// @dev This function is the heart of the safety model. See docs/04-contracts.md §4 for the
-    ///      full flow. Reverts on stale state, expired proposals, hard-constraint violations.
-    function executeApproved(bytes32 proposalId) external override nonReentrant whenNotPaused {
+    function executeApproved(bytes32 proposalId)
+        external
+        override
+        nonReentrant
+        whenNotPaused
+    {
         require(!executedProposals[proposalId], "TreasuryVault: already executed");
 
         IProposalRegistry reg = IProposalRegistry(proposalRegistry);
         IProposalRegistry.Proposal memory p = reg.getProposal(proposalId);
 
-        // Validate proposal state
-        require(p.state == ProposalState.Approved, "TreasuryVault: not approved");
-        require(block.timestamp >= p.earliestExecution, "TreasuryVault: timelock active");
-        require(block.timestamp <= p.expiresAt, "TreasuryVault: proposal expired");
+        require(
+            p.state == ProposalState.Approved,
+            "TreasuryVault: proposal not approved"
+        );
+        require(
+            block.timestamp >= p.earliestExecution,
+            "TreasuryVault: timelock active"
+        );
+        require(
+            block.timestamp <= p.submittedAt + reg.PROPOSAL_TTL(),
+            "TreasuryVault: proposal expired"
+        );
 
-        // Re-evaluate PolicyEngine at execution time (defense-in-depth)
-        TreasuryState memory liveState = _liveStateForEngine();
-        MarketState memory liveMarket = _liveMarketForEngine();
-        Verdict memory v = IPolicyEngine(engine).evaluate(p.policyHash, liveState, liveMarket, p.actions);
-        require(v.kind == VerdictKind.Approve, "TreasuryVault: stale verdict");
+        TreasuryState memory liveState = _buildTreasuryState();
+        bytes memory stateBytes = abi.encode(
+            uint256(liveState.assets.length),
+            uint256(0),
+            liveState.totalNAVUsdc,
+            uint256(liveState.snapshotAt),
+            liveState.stateHash,
+            liveState.assets,
+            liveState.balances,
+            liveState.balances
+        );
 
-        // Dispatch each action to its adapter
+        bytes memory actionsBytes = _encodeActions(p.actions);
+
+        bytes memory verdictBytes = IPolicyEngine(engine).evaluate(
+            p.policyHash,
+            stateBytes,
+            bytes(""),
+            actionsBytes
+        );
+
+        Verdict memory verdict = _decodeVerdict(verdictBytes);
+        require(
+            verdict.kind == VerdictKind.Approve,
+            "TreasuryVault: stale verdict -- policy rejected at execution"
+        );
+
         for (uint256 i = 0; i < p.actions.length; i++) {
             _dispatch(p.actions[i]);
-            emit ActionDispatched(uint8(p.actions[i].kind), p.actions[i].adapter, p.actions[i].params);
         }
 
-        // Record tax events
-        ITaxEngine(taxEngine).recordExecution(proposalId, p.actions);
+        if (taxEngine != address(0)) {
+            try ITaxEngine(taxEngine).recordExecution(proposalId, p.actions) {}
+            catch {}
+        }
 
-        // Mark as executed
         executedProposals[proposalId] = true;
-        bytes32 postStateHash = keccak256(abi.encode(_liveStateForEngine()));
+        lastActionAt = block.timestamp;
+
+        bytes32 postStateHash = keccak256(abi.encode(liveState.assets, liveState.balances, block.timestamp));
         reg.markExecuted(proposalId, postStateHash);
 
-        lastActionAt = block.timestamp;
-        emit Executed(proposalId);
+        emit ProposalExecuted(proposalId);
     }
 
     function _dispatch(Action memory a) internal {
-        require(a.kind != ActionKind.NOOP, "TreasuryVault: noop");
-        IAdapter adapter = IAdapter(a.adapter);
-        require(!adapter.circuitBreakerActive(), "TreasuryVault: adapter breaker");
-        adapter.execute(a);
-
-        // Update 24h movement tracking
-        uint256 hour = block.timestamp / 1 hours;
-        movementByHour[hour % 24] += a.amount;
-    }
-
-    // ──────────── Internal state builders ────────────
-
-    function _liveStateForEngine() internal view returns (TreasuryState memory) {
-        uint256 len = assetList.length;
-        address[] memory assets = new address[](len);
-        uint256[] memory balances = new uint256[](len);
-
-        for (uint256 i = 0; i < len; i++) {
-            assets[i] = assetList[i];
-            (, bytes memory data) = assets[i].staticcall(
-                abi.encodeWithSignature("balanceOf(address)", address(this))
-            );
-            if (data.length >= 32) {
-                balances[i] = abi.decode(data, (uint256));
+        if (a.kind == ActionKind.NOOP) return;
+        if (a.adapter != address(0)) {
+            IAdapter adapter = IAdapter(a.adapter);
+            require(!adapter.circuitBreakerActive(), "TreasuryVault: adapter circuit breaker");
+            if (a.asset != address(0) && a.amount > 0) {
+                IERC20(a.asset).safeIncreaseAllowance(a.adapter, a.amount);
             }
-        }
-
-        uint256 nav = this.getNAV();
-
-        return TreasuryState({
-            assets: assets,
-            balances: balances,
-            totalNAVUsdc: nav,
-            snapshotAt: uint64(block.timestamp),
-            stateHash: keccak256(abi.encode(assets, balances, nav, block.timestamp))
-        });
-    }
-
-    function _liveMarketForEngine() internal view returns (MarketState memory) {
-        IOracleAggregator oracle = IOracleAggregator(oracleAggregator);
-        uint256 len = assetList.length;
-        address[] memory assets = new address[](len);
-        uint256[] memory prices = new uint256[](len);
-        uint64[] memory observed = new uint64[](len);
-
-        for (uint256 i = 0; i < len; i++) {
-            assets[i] = assetList[i];
-            if (assetsMap[assets[i]].active) {
-                IOracleAggregator.PriceQuote memory q = oracle.priceOf(assets[i]);
-                prices[i] = q.priceUsd6;
-                observed[i] = q.observedAt;
+            adapter.execute(a);
+            if (a.asset != address(0)) {
+                uint256 remaining = IERC20(a.asset).allowance(address(this), a.adapter);
+                if (remaining > 0) {
+                    IERC20(a.asset).safeDecreaseAllowance(a.adapter, remaining);
+                }
             }
+        } else if (a.kind == ActionKind.TRANSFER) {
+            address recipient = abi.decode(a.params, (address));
+            require(assetsMap[a.asset].active, "TreasuryVault: unregistered asset");
+            IERC20(a.asset).safeTransfer(recipient, a.amount);
         }
-
-        return MarketState({
-            assets: assets,
-            pricesUsd6: prices,
-            observedAt: observed,
-            marketHash: keccak256(abi.encode(assets, prices, observed))
-        });
     }
 
-    // ──────────── Emergency ────────────
     function emergencyPause() external override onlyGuardian {
         paused = true;
         emit EmergencyPaused(msg.sender);
@@ -264,5 +285,53 @@ contract TreasuryVault is ITreasuryVault {
     function emergencyUnpause() external override onlySafe {
         paused = false;
         emit EmergencyUnpaused(msg.sender);
+    }
+
+    function _encodeActions(Action[] memory actions) internal pure returns (bytes memory) {
+        bytes memory out = abi.encode(uint256(actions.length));
+        for (uint256 i = 0; i < actions.length; i++) {
+            Action memory a = actions[i];
+            out = bytes.concat(
+                out,
+                abi.encode(uint256(uint8(a.kind))),
+                abi.encode(a.adapter),
+                abi.encode(a.asset),
+                abi.encode(a.amount),
+                abi.encode(uint256(a.params.length)),
+                a.params,
+                new bytes((32 - a.params.length % 32) % 32)
+            );
+        }
+        return out;
+    }
+
+    function _decodeVerdict(bytes memory data) internal pure returns (Verdict memory v) {
+        require(data.length >= 6 * 32, "TreasuryVault: verdict too short");
+        uint256 kind;
+        bytes32 policyHash;
+        bytes32 computedActionsHash;
+        bytes32 marketStateHash;
+        uint64 evaluatedAt;
+        assembly {
+            kind              := mload(add(data, 32))
+            policyHash        := mload(add(data, 64))
+            computedActionsHash := mload(add(data, 96))
+            marketStateHash   := mload(add(data, 128))
+            evaluatedAt       := mload(add(data, 160))
+        }
+        uint256 reasonLen;
+        assembly { reasonLen := mload(add(data, 192)) }
+        bytes memory reason = new bytes(reasonLen);
+        for (uint256 i = 0; i < reasonLen && 224 + i < data.length; i++) {
+            reason[i] = data[224 + i];
+        }
+        v = Verdict({
+            kind: VerdictKind(kind),
+            policyHash: policyHash,
+            computedActionsHash: computedActionsHash,
+            marketStateHash: marketStateHash,
+            evaluatedAt: evaluatedAt,
+            rejectReason: reason
+        });
     }
 }

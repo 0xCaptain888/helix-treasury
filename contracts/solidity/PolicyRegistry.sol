@@ -91,10 +91,16 @@ contract PolicyRegistry is IPolicyRegistry {
         return _policyMeta[policyHash].hardConstraintIds;
     }
 
+    function activePolicyBytecode() external view returns (bytes memory) {
+        return _policyBytecode[activePolicyHash];
+    }
+
     // ──────────── Internal ────────────
     function _proposeUpdate(bytes calldata newBytecode, bytes32[] memory newConstraintIds) internal returns (bytes32 newHash) {
+        require(newBytecode.length > 0, "PolicyRegistry: empty bytecode");
         newHash = keccak256(newBytecode);
-        require(_policyBytecode[newHash].length == 0 || !_policyMeta[newHash].active, "PolicyRegistry: already active");
+        require(newHash != activePolicyHash, "PolicyRegistry: same policy");
+        require(_policyBytecode[newHash].length == 0, "PolicyRegistry: already exists");
 
         _policyBytecode[newHash] = newBytecode;
         _policyMeta[newHash] = PolicyMeta({
@@ -115,7 +121,8 @@ contract PolicyRegistry is IPolicyRegistry {
 
     function _activateUpdate(bytes32 newHash) internal {
         require(newHash == pendingPolicyHash, "PolicyRegistry: not pending");
-        require(block.timestamp >= pendingProposedAt + POLICY_UPDATE_TIMELOCK, "PolicyRegistry: timelock");
+        require(block.timestamp >= pendingProposedAt + POLICY_UPDATE_TIMELOCK, "PolicyRegistry: timelock not expired");
+        require(_policyBytecode[newHash].length > 0, "PolicyRegistry: bytecode not found");
 
         // Ensure new constraints are a superset of current
         bytes32[] memory currentConstraints = _policyMeta[activePolicyHash].hardConstraintIds;

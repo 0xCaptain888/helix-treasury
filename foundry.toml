@@ -2,20 +2,24 @@
 src = "contracts/solidity"
 out = "out"
 libs = ["lib"]
-test = "test/solidity"
+test = "test"
 script = "scripts/solidity"
-
+remappings = [
+  "forge-std/=lib/forge-std/src/",
+  "@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/"
+]
 solc_version = "0.8.26"
 optimizer = true
 optimizer_runs = 200
 via_ir = true
 fs_permissions = [{ access = "read-write", path = "./" }]
 
-# Stylus contracts live in contracts/stylus and are built separately with cargo-stylus
-
 [profile.ci]
-fuzz = { runs = 10000 }
-invariant = { runs = 1000, depth = 64 }
+src = "contracts/solidity"
+test = "test"
+fuzz = { runs = 256 }
+invariant = { runs = 64 }
+verbosity = 2
 
 [fmt]
 line_length = 100

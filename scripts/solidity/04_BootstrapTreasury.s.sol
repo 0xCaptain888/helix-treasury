@@ -49,46 +49,38 @@ contract BootstrapTreasury is Script {
 
         vault.registerAsset(ITreasuryVault.AssetEntry({
             token: USDC_SEPOLIA,
-            decimals: 6,
-            isStable: true,
-            isLiquid: true,
-            protocol: ITreasuryVault.Protocol.WALLET,
-            adapter: address(0),
-            active: true
+            tokenType: 1,       // stablecoin
+            adapter: bytes32(0),
+            active: true,
+            registeredAt: 0     // set by contract
         }));
         console2.log("Registered: USDC");
 
         vault.registerAsset(ITreasuryVault.AssetEntry({
             token: WETH_SEPOLIA,
-            decimals: 18,
-            isStable: false,
-            isLiquid: true,
-            protocol: ITreasuryVault.Protocol.WALLET,
-            adapter: address(0),
-            active: true
+            tokenType: 0,       // standard ERC20
+            adapter: bytes32(0),
+            active: true,
+            registeredAt: 0
         }));
         console2.log("Registered: WETH");
 
         vault.registerAsset(ITreasuryVault.AssetEntry({
             token: ARB_SEPOLIA,
-            decimals: 18,
-            isStable: false,
-            isLiquid: true,
-            protocol: ITreasuryVault.Protocol.WALLET,
-            adapter: address(0),
-            active: true
+            tokenType: 0,       // standard ERC20
+            adapter: bytes32(0),
+            active: true,
+            registeredAt: 0
         }));
         console2.log("Registered: ARB");
 
         if (RH_TBILL_SEPOLIA != address(0)) {
             vault.registerAsset(ITreasuryVault.AssetEntry({
                 token: RH_TBILL_SEPOLIA,
-                decimals: 18,
-                isStable: false,
-                isLiquid: false,  // T-bills have settlement delay
-                protocol: ITreasuryVault.Protocol.RWA,
-                adapter: address(0), // Robinhood adapter registered separately
-                active: true
+                tokenType: 2,   // RWA
+                adapter: bytes32(0),
+                active: true,
+                registeredAt: 0
             }));
             console2.log("Registered: RH_TBILL");
         }

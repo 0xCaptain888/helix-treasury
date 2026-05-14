@@ -109,6 +109,11 @@ contract OracleAggregator is IOracleAggregator {
         });
     }
 
+    function getPrice(address asset) external view override returns (uint256 priceUsdc6, uint256 updatedAt) {
+        PriceQuote memory q = this.priceOf(asset);
+        return (q.priceUsd6, uint256(q.observedAt));
+    }
+
     function snapshot(address[] calldata assets) external view override returns (PriceQuote[] memory quotes) {
         quotes = new PriceQuote[](assets.length);
         for (uint256 i = 0; i < assets.length; i++) {

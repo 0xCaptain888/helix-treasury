@@ -143,24 +143,20 @@ contract DeployAll is Script {
         // Register USDC
         vault.registerAsset(ITreasuryVault.AssetEntry({
             token: USDC,
-            decimals: 6,
-            isStable: true,
-            isLiquid: true,
-            protocol: ITreasuryVault.Protocol.WALLET,
-            adapter: address(0),
-            active: true
+            tokenType: 1,
+            adapter: bytes32(0),
+            active: true,
+            registeredAt: 0
         }));
         console2.log("Registered: USDC");
 
         // Register WETH
         vault.registerAsset(ITreasuryVault.AssetEntry({
             token: WETH,
-            decimals: 18,
-            isStable: false,
-            isLiquid: true,
-            protocol: ITreasuryVault.Protocol.WALLET,
-            adapter: address(0),
-            active: true
+            tokenType: 0,
+            adapter: bytes32(0),
+            active: true,
+            registeredAt: 0
         }));
         console2.log("Registered: WETH");
 

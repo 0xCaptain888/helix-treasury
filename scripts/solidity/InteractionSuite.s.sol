@@ -137,56 +137,46 @@ contract InteractionSuite is Script {
 
         vault.registerAsset(ITreasuryVault.AssetEntry({
             token: address(mockUSDC),
-            decimals: 6,
-            isStable: true,
-            isLiquid: true,
-            protocol: ITreasuryVault.Protocol.WALLET,
-            adapter: address(0),
-            active: true
+            tokenType: 1,
+            adapter: bytes32(0),
+            active: true,
+            registeredAt: 0
         }));
         console2.log("Registered: mUSDC");
 
         vault.registerAsset(ITreasuryVault.AssetEntry({
             token: address(mockWETH),
-            decimals: 18,
-            isStable: false,
-            isLiquid: true,
-            protocol: ITreasuryVault.Protocol.WALLET,
-            adapter: address(0),
-            active: true
+            tokenType: 0,
+            adapter: bytes32(0),
+            active: true,
+            registeredAt: 0
         }));
         console2.log("Registered: mWETH");
 
         vault.registerAsset(ITreasuryVault.AssetEntry({
             token: address(mockARB),
-            decimals: 18,
-            isStable: false,
-            isLiquid: true,
-            protocol: ITreasuryVault.Protocol.WALLET,
-            adapter: address(0),
-            active: true
+            tokenType: 0,
+            adapter: bytes32(0),
+            active: true,
+            registeredAt: 0
         }));
         console2.log("Registered: mARB");
 
         vault.registerAsset(ITreasuryVault.AssetEntry({
             token: address(mockSPY),
-            decimals: 18,
-            isStable: false,
-            isLiquid: false,
-            protocol: ITreasuryVault.Protocol.RWA,
-            adapter: RWA_ADAPTER,
-            active: true
+            tokenType: 2,
+            adapter: keccak256("robinhood-rwa"),
+            active: true,
+            registeredAt: 0
         }));
         console2.log("Registered: mSPY (RWA)");
 
         vault.registerAsset(ITreasuryVault.AssetEntry({
             token: address(mockTBILL),
-            decimals: 18,
-            isStable: true,
-            isLiquid: false,
-            protocol: ITreasuryVault.Protocol.RWA,
-            adapter: RWA_ADAPTER,
-            active: true
+            tokenType: 2,
+            adapter: keccak256("robinhood-rwa"),
+            active: true,
+            registeredAt: 0
         }));
         console2.log("Registered: mTBILL (RWA)");
 
@@ -477,12 +467,10 @@ contract InteractionSuite is Script {
 
         vault.registerAsset(ITreasuryVault.AssetEntry({
             token: address(tempToken),
-            decimals: 18,
-            isStable: false,
-            isLiquid: true,
-            protocol: ITreasuryVault.Protocol.WALLET,
-            adapter: address(0),
-            active: true
+            tokenType: 0,
+            adapter: bytes32(0),
+            active: true,
+            registeredAt: 0
         }));
         console2.log("Registered: TEMP");
 
