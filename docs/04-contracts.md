@@ -158,7 +158,7 @@ address public hardConstraintsLib;  // library of standard constraints
 ### Events
 
 ```solidity
-event PolicyProposed(bytes32 indexed hash, address indexed by, uint64 earliestActivation);
+event PolicyProposed(bytes32 indexed newHash, bytes32 indexed previousHash, address author);
 event PolicyActivated(bytes32 indexed hash, bytes32 indexed previousHash);
 event PolicyRejected(bytes32 indexed hash, bytes reason);
 ```
@@ -428,6 +428,9 @@ interface ITaxEngine {
         address asset;
         uint256 amount;
         uint256 costBasis;        // for realized gain/loss
+        uint256 proceedsUsd6;     // proceeds in USD 6-decimal
+        int256  realizedPnlUsd6;  // realized PnL in USD 6-decimal
+        uint8   lotMethod;        // 0=FIFO, 1=LIFO, 2=HIFO at time of event
         bytes8  jurisdiction;     // ISO-3166-1 alpha-2 (e.g. "US", "GB", "DE")
         bytes32 metadata;         // hash of extended metadata stored off-chain
     }
