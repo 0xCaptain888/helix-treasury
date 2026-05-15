@@ -13,7 +13,7 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg?style=flat-square)](LICENSE)
 [![Open House London](https://img.shields.io/badge/Arbitrum-Open%20House%20London%202026-12AAFF?style=flat-square)](https://arbitrum-london.hackquest.io/)
 
-[Documentation](./docs) · [Architecture](./docs/01-architecture.md) · [Security Model](./docs/05-security-model.md) · [Roadmap](./docs/08-roadmap.md)
+[Live Demo](https://k5pb7g7r.mule.page/) · [Documentation](./docs) · [Architecture](./docs/01-architecture.md) · [Security Model](./docs/05-security-model.md) · [Roadmap](./docs/08-roadmap.md) · [X / Twitter](https://x.com/0xCaptain888)
 
 </div>
 
@@ -283,7 +283,7 @@ Mainnet deployment is **explicitly gated** on third-party audit and Immunefi bug
 **0xCaptain888** -- Solo builder.
 Full-stack blockchain engineer. 5+ years Solidity + TypeScript.
 Rust / Stylus since 2024. Background in treasury operations for mid-size DAOs.
-[@0xCaptain888](https://github.com/0xCaptain888)
+[@0xCaptain888](https://github.com/0xCaptain888) · [X / Twitter](https://x.com/0xCaptain888)
 
 *Helix is a solo buildathon entry. The breadth of the codebase -- Stylus PolicyEngine in Rust,
 Solidity contracts, TypeScript agent, SDK, full security model -- reflects the depth of the
